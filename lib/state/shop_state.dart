@@ -77,6 +77,7 @@ class ShopState extends ChangeNotifier {
 
   void add(Product product) {
     final current = _cart[product.cartKey]?.quantity ?? 0;
+    if (!product.canAddMore(current)) return;
     setQuantity(product, current + 1);
   }
 
@@ -84,7 +85,15 @@ class ShopState extends ChangeNotifier {
     if (quantity <= 0) {
       _cart.remove(product.cartKey);
     } else {
-      _cart[product.cartKey] = CartLine(product: product, quantity: quantity);
+      final limit = product.maxOrderQuantity;
+      if (limit == 0) {
+        _cart.remove(product.cartKey);
+      } else {
+        _cart[product.cartKey] = CartLine(
+          product: product,
+          quantity: limit == null || quantity <= limit ? quantity : limit,
+        );
+      }
     }
     notifyListeners();
     if (user != null && !product.isProductSet) {
@@ -149,5 +158,37 @@ class ShopState extends ChangeNotifier {
   static String _message(Object error) {
     final text = error.toString();
     return text.startsWith('Exception: ') ? text.substring(11) : text;
+  }
+
+  Future<bool> loginWithGoogle(String idToken) async {
+    busy = true;
+    error = null;
+    notifyListeners();
+    try {
+      user = await service.loginWithGoogle(idToken);
+      return true;
+    } catch (e) {
+      error = _message(e);
+      return false;
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> loginWithTelegram(Map<String, dynamic> authData) async {
+    busy = true;
+    error = null;
+    notifyListeners();
+    try {
+      user = await service.loginWithTelegram(authData);
+      return true;
+    } catch (e) {
+      error = _message(e);
+      return false;
+    } finally {
+      busy = false;
+      notifyListeners();
+    }
   }
 }

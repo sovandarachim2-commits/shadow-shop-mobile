@@ -104,12 +104,22 @@ class ShopService {
     return Map<String, dynamic>.from(response.data as Map);
   }
 
-  Future<List<Product>> products({String search = ''}) async {
+  Future<List<Product>> products({
+    String search = '',
+    int? categoryId,
+    int? brandId,
+    int? limit,
+    String ordering = '-created_at',
+  }) async {
     final response = await api.dio.get(
       'products/items/',
       queryParameters: {
         'is_active': true,
         if (search.trim().isNotEmpty) 'search': search.trim(),
+        if (categoryId != null) 'category': categoryId,
+        if (brandId != null) 'brand': brandId,
+        if (limit != null) 'page_size': limit,
+        'ordering': ordering,
       },
     );
     return _rows(response)
@@ -122,10 +132,16 @@ class ShopService {
     return Map<String, dynamic>.from(response.data as Map);
   }
 
-  Future<List<Map<String, dynamic>>> productSets({String search = ''}) async {
+  Future<List<Map<String, dynamic>>> productSets({
+    String search = '',
+    int? limit,
+    String ordering = '-created_at',
+  }) async {
     final response = await api.dio.get('products/sets/', queryParameters: {
       'is_active': true,
       if (search.trim().isNotEmpty) 'search': search.trim(),
+      if (limit != null) 'page_size': limit,
+      'ordering': ordering,
     });
     return _rows(response);
   }
@@ -152,9 +168,19 @@ class ShopService {
   Future<List<Map<String, dynamic>>> categories() async {
     final response = await api.dio.get(
       'products/categories/',
-      queryParameters: {'is_active': true},
+      queryParameters: {'is_active': true, 'page_size': 1000},
     );
     return _rows(response);
+  }
+
+  Future<List<Map<String, dynamic>>> brands() async {
+    final response = await api.dio.get(
+      'products/brands/',
+      queryParameters: {'page_size': 1000},
+    );
+    return _rows(response)
+        .where((brand) => brand['is_active'] != false)
+        .toList();
   }
 
   Future<List<Map<String, dynamic>>> myOrders() async {
@@ -201,5 +227,26 @@ class ShopService {
     final rows =
         data is List ? data : (data as Map)['results'] as List? ?? const [];
     return rows.map((row) => Map<String, dynamic>.from(row as Map)).toList();
+  }
+
+  Future<Map<String, dynamic>> loginWithGoogle(String idToken) async {
+    final response = await api.dio.post(
+      'auth/social/google/',
+      data: {'id_token': idToken},
+    );
+    final data = Map<String, dynamic>.from(response.data as Map);
+    await api.saveTokens(data);
+    return Map<String, dynamic>.from(data['user'] as Map);
+  }
+
+  Future<Map<String, dynamic>> loginWithTelegram(
+      Map<String, dynamic> authData) async {
+    final response = await api.dio.post(
+      'auth/social/telegram/',
+      data: authData,
+    );
+    final data = Map<String, dynamic>.from(response.data as Map);
+    await api.saveTokens(data);
+    return Map<String, dynamic>.from(data['user'] as Map);
   }
 }

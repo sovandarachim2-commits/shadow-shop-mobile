@@ -1,9 +1,11 @@
+import 'dart:convert';
+import 'dart:async';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shadow_shop_mobile/state/shop_state.dart';
 import 'package:shadow_shop_mobile/theme/app_theme.dart';
-import 'dart:convert';
-import 'package:dio/dio.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -16,18 +18,32 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final _name = TextEditingController();
   final _phone = TextEditingController();
   final _address = TextEditingController();
+  final _addressLine2 = TextEditingController();
   final _district = TextEditingController();
   final _notes = TextEditingController();
   final _coupon = TextEditingController();
   String? _couponError;
   double _couponDiscount = 0;
+  bool _couponApplied = false;
   String _province = 'phnom_penh';
   String _payment = 'cod';
   double _deliveryFee = 3;
   bool _submitting = false;
+  bool _loadingDelivery = true;
+  String? _deliveryError;
   Map<String, dynamic>? _siteSettings;
+  Timer? _couponDebounce;
 
-  static const _provinces = <String, String>{
+  static const Map<String, dynamic> _defaultDeliveryFees = {
+    'phnom_penh': 3,
+    'kandal': 4,
+    'takeo': 4,
+    'kampong_cham': 5,
+    'siem_reap': 6,
+    'battambang': 6,
+  };
+
+  static const _provinceLabels = <String, String>{
     'phnom_penh': 'Phnom Penh',
     'kandal': 'Kandal',
     'takeo': 'Takeo',
@@ -52,6 +68,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     'preah_vihear': 'Preah Vihear',
     'kampong_chhnang': 'Kampong Chhnang',
     'tbong_khmum': 'Tbong Khmum',
+    'kep': 'Kep',
   };
 
   @override
@@ -66,49 +83,45 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _loadDelivery() async {
+    final state = context.read<ShopState>();
+    setState(() {
+      _loadingDelivery = true;
+      _deliveryError = null;
+    });
     try {
-      final settings = await context.read<ShopState>().service.siteSettings();
+      final settings = await state.service.siteSettings();
+      await state.loadAddresses();
       if (!mounted) return;
-      final feeMap = settings['delivery_fees'] is Map
-          ? Map<String, dynamic>.from(settings['delivery_fees'])
-          : <String, dynamic>{};
+      final addresses = state.savedAddresses;
+      final savedAddress =
+          addresses.where((item) => item['is_default'] == true).firstOrNull ??
+              addresses.firstOrNull;
       setState(() {
         _siteSettings = settings;
-        final value = feeMap[_province];
-        if (value is Map)
-          _deliveryFee = double.tryParse('${value['fee']}') ?? 3;
-        else if (value != null) _deliveryFee = double.tryParse('$value') ?? 3;
-        final paymentMap = settings['payment_methods'];
-        if (paymentMap is Map && paymentMap[_payment] == false)
-          _payment = 'cod';
+        if (savedAddress != null) {
+          _name.text = savedAddress['full_name']?.toString() ?? _name.text;
+          _phone.text = savedAddress['phone']?.toString() ?? _phone.text;
+          _address.text = savedAddress['address_line1']?.toString() ?? '';
+          _addressLine2.text = savedAddress['address_line2']?.toString() ?? '';
+          _district.text = savedAddress['city']?.toString() ?? '';
+          _province = _matchDeliveryZone(savedAddress['state']?.toString()) ??
+              _defaultDeliveryZone;
+        } else {
+          _province = _defaultDeliveryZone;
+        }
+        _deliveryFee = _feeFor(_province);
+        _loadingDelivery = false;
+        _payment = _availablePayments.any((method) => method.$1 == _payment)
+            ? _payment
+            : _availablePayments.firstOrNull?.$1 ?? 'cod';
       });
-      await context.read<ShopState>().loadAddresses();
-      final defaultAddress = context
-          .read<ShopState>()
-          .savedAddresses
-          .where((item) => item['is_default'] == true)
-          .firstOrNull;
-      if (defaultAddress != null && mounted) {
-        setState(() {
-          _name.text = defaultAddress['full_name']?.toString() ?? _name.text;
-          _phone.text = defaultAddress['phone']?.toString() ?? _phone.text;
-          _address.text = [
-            defaultAddress['address_line1'],
-            defaultAddress['address_line2'],
-            defaultAddress['city']
-          ].where((item) => item != null && '$item'.isNotEmpty).join(', ');
-          _district.text = defaultAddress['city']?.toString() ?? '';
-          final province = defaultAddress['state']?.toString();
-          if (province != null) {
-            final key = _provinces.keys
-                .where((item) =>
-                    _provinces[item]?.toLowerCase() == province.toLowerCase())
-                .firstOrNull;
-            if (key != null) _province = key;
-          }
-        });
-      }
-    } catch (_) {}
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loadingDelivery = false;
+        _deliveryError = friendlyError(error);
+      });
+    }
   }
 
   @override
@@ -116,28 +129,103 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _name.dispose();
     _phone.dispose();
     _address.dispose();
+    _addressLine2.dispose();
     _district.dispose();
     _notes.dispose();
     _coupon.dispose();
+    _couponDebounce?.cancel();
     super.dispose();
   }
 
-  double _feeFor(String province) {
-    final fees = _siteSettings?['delivery_fees'];
-    if (fees is Map) {
-      final value = fees[province];
-      if (value is Map) return double.tryParse('${value['fee']}') ?? 3;
-      if (value != null) return double.tryParse('$value') ?? 3;
+  Map<String, dynamic> get _deliveryZones {
+    final settings = _siteSettings?['delivery_fees'];
+    if (settings is Map && settings.isNotEmpty) {
+      return Map<String, dynamic>.from(settings);
     }
-    const defaults = {
-      'phnom_penh': 3,
-      'kandal': 4,
-      'takeo': 4,
-      'kampong_cham': 5,
-      'siem_reap': 6,
-      'battambang': 6
-    };
-    return (defaults[province] ?? 5).toDouble();
+    return _defaultDeliveryFees;
+  }
+
+  List<MapEntry<String, dynamic>> get _enabledDeliveryZones =>
+      _deliveryZones.entries.where((entry) {
+        final value = entry.value;
+        return value is! Map || value['enabled'] != false;
+      }).toList();
+
+  String get _defaultDeliveryZone {
+    final zones = _enabledDeliveryZones;
+    return zones
+            .where((entry) =>
+                entry.value is Map && entry.value['is_default'] == true)
+            .firstOrNull
+            ?.key ??
+        zones.firstOrNull?.key ??
+        'phnom_penh';
+  }
+
+  String _zoneLabel(String key) {
+    final value = _deliveryZones[key];
+    if (value is Map && value['label'] != null) {
+      return value['label'].toString();
+    }
+    return _provinceLabels[key] ??
+        key
+            .split('_')
+            .map((part) => part.isEmpty
+                ? part
+                : '${part[0].toUpperCase()}${part.substring(1)}')
+            .join(' ');
+  }
+
+  String? _matchDeliveryZone(String? addressState) {
+    final state = addressState?.trim().toLowerCase();
+    if (state == null || state.isEmpty) return null;
+    for (final entry in _enabledDeliveryZones) {
+      if (entry.key.toLowerCase() == state ||
+          _zoneLabel(entry.key).toLowerCase() == state) {
+        return entry.key;
+      }
+    }
+    final normalizedState = state.replaceAll(RegExp(r'[^a-z0-9]+'), '_');
+    return _enabledDeliveryZones
+        .where((entry) => entry.key.toLowerCase() == normalizedState)
+        .firstOrNull
+        ?.key;
+  }
+
+  double _feeFor(String province) {
+    final value = _deliveryZones[province];
+    final fee = value is Map ? value['fee'] : value;
+    return double.tryParse('$fee') ?? 0;
+  }
+
+  bool get _hasDeliveryAddress =>
+      _name.text.trim().isNotEmpty &&
+      _phone.text.trim().isNotEmpty &&
+      _address.text.trim().isNotEmpty;
+
+  double get _checkoutDeliveryFee => _hasDeliveryAddress ? _deliveryFee : 0;
+
+  void _onDeliveryDetailsChanged() {
+    final revalidateCoupon = _couponApplied;
+    setState(() {});
+    if (revalidateCoupon) {
+      _couponDebounce?.cancel();
+      _couponDebounce = Timer(const Duration(milliseconds: 350), () {
+        if (mounted) _applyCoupon();
+      });
+    }
+  }
+
+  String get _orderDeliveryNote {
+    final location = [
+      if (_district.text.trim().isNotEmpty) _district.text.trim(),
+      _zoneLabel(_province),
+    ].join(', ');
+    final customNote = _notes.text.trim();
+    return [
+      'Home delivery${location.isEmpty ? '' : '. $location'}',
+      if (customNote.isNotEmpty) 'Delivery note: $customNote',
+    ].join('. ');
   }
 
   List<(String, String, IconData)> get _availablePayments {
@@ -170,12 +258,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final data = await context.read<ShopState>().service.validateCoupon(
             code,
             context.read<ShopState>().subtotal,
-            _deliveryFee,
+            _checkoutDeliveryFee,
           );
       if (!mounted) return;
       setState(() {
         _coupon.text = '${data['coupon_code'] ?? code}';
-        _couponDiscount = (double.tryParse('') ?? 0);
+        _couponDiscount = double.tryParse('${data['discount']}') ?? 0;
+        _couponApplied = true;
         _couponError = null;
       });
     } on DioException catch (error) {
@@ -183,6 +272,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final body = error.response?.data;
       setState(() {
         _couponDiscount = 0;
+        _couponApplied = false;
         _couponError = body is Map
             ? '${body['detail'] ?? body.values.first}'
             : 'Coupon could not be applied.';
@@ -191,7 +281,31 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _submit() async {
+    if (_loadingDelivery || _deliveryError != null) {
+      showStoreMessage(
+        context,
+        'Load delivery settings before placing your order',
+        icon: Icons.local_shipping_outlined,
+      );
+      return;
+    }
     if (!_form.currentState!.validate()) return;
+    if (_enabledDeliveryZones.isEmpty) {
+      showStoreMessage(
+        context,
+        'No delivery zones are available',
+        icon: Icons.location_off_outlined,
+      );
+      return;
+    }
+    if (!_availablePayments.any((method) => method.$1 == _payment)) {
+      showStoreMessage(
+        context,
+        'No payment methods are available for this delivery zone',
+        icon: Icons.payment_outlined,
+      );
+      return;
+    }
     final state = context.read<ShopState>();
     if (state.cartLines.isEmpty) return;
     setState(() => _submitting = true);
@@ -200,15 +314,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         'name': _name.text.trim(),
         'phone': _phone.text.trim(),
         'email': state.user?['email'] ?? '',
-        'address': _address.text.trim(),
+        'address': [
+          if (_addressLine2.text.trim().isNotEmpty) _addressLine2.text.trim(),
+          if (_district.text.trim().isNotEmpty) _district.text.trim(),
+          _zoneLabel(_province),
+        ].join(', '),
         'address_detail': _address.text.trim(),
         'province': _province,
         'district': _district.text.trim(),
-        'notes': _notes.text.trim(),
+        'notes': _orderDeliveryNote,
         'payment_method': _payment,
         'payment_status': 'unpaid',
-        'delivery_fee': _deliveryFee,
-        'coupon_code': _couponDiscount > 0 ? _coupon.text.trim() : '',
+        'delivery_fee': _checkoutDeliveryFee,
+        'coupon_code': _couponApplied ? _coupon.text.trim() : '',
         'items': state.cartLines
             .map((line) => {
                   if (!line.product.isProductSet) 'product': line.product.id,
@@ -329,6 +447,37 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           child: ListView(padding: const EdgeInsets.all(18), children: [
             const Text('Delivery information',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            if (_deliveryError != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3F2),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Delivery settings could not be loaded: $_deliveryError',
+                        style: const TextStyle(
+                          color: Color(0xFFB42318),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _loadingDelivery ? null : _loadDelivery,
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            if (_loadingDelivery) ...[
+              const SizedBox(height: 10),
+              const LinearProgressIndicator(),
+            ],
             const SizedBox(height: 12),
             TextFormField(
                 controller: _name,
@@ -338,7 +487,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         borderRadius: BorderRadius.all(Radius.circular(14)))),
                 validator: (value) => value == null || value.trim().isEmpty
                     ? 'Enter the receiver name'
-                    : null),
+                    : null,
+                onChanged: (_) => _onDeliveryDetailsChanged()),
             const SizedBox(height: 12),
             TextFormField(
                 controller: _phone,
@@ -349,48 +499,74 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         borderRadius: BorderRadius.all(Radius.circular(14)))),
                 validator: (value) => value == null || value.trim().length < 8
                     ? 'Enter a valid phone number'
-                    : null),
+                    : null,
+                onChanged: (_) => _onDeliveryDetailsChanged()),
             const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-                initialValue: _province,
-                decoration: const InputDecoration(
-                    labelText: 'Province',
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(14)))),
-                items: _provinces.entries
-                    .map((item) => DropdownMenuItem(
-                        value: item.key, child: Text(item.value)))
-                    .toList(),
-                onChanged: (value) {
-                  if (value != null)
-                    setState(() {
-                      _province = value;
-                      _deliveryFee = _feeFor(value);
-                      if (!_availablePayments
-                          .any((method) => method.$1 == _payment)) {
-                        _payment = _availablePayments.firstOrNull?.$1 ?? 'cod';
-                      }
-                    });
-                }),
+            if (_enabledDeliveryZones.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3F2),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Text(
+                  'No delivery zones are enabled. Please contact the store.',
+                  style: TextStyle(color: Color(0xFFB42318)),
+                ),
+              )
+            else
+              DropdownButtonFormField<String>(
+                  initialValue: _province,
+                  decoration: const InputDecoration(
+                      labelText: 'Province',
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(14)))),
+                  items: _enabledDeliveryZones
+                      .map((item) => DropdownMenuItem(
+                          value: item.key, child: Text(_zoneLabel(item.key))))
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        _province = value;
+                        _deliveryFee = _feeFor(value);
+                        _payment = _availablePayments
+                                .any((method) => method.$1 == _payment)
+                            ? _payment
+                            : _availablePayments.firstOrNull?.$1 ?? '';
+                      });
+                      if (_couponApplied) _applyCoupon();
+                    }
+                  }),
             const SizedBox(height: 12),
             TextFormField(
                 controller: _district,
                 decoration: const InputDecoration(
                     labelText: 'District / area',
                     border: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(14))))),
+                        borderRadius: BorderRadius.all(Radius.circular(14)))),
+                onChanged: (_) => _onDeliveryDetailsChanged()),
+            const SizedBox(height: 12),
+            TextFormField(
+                controller: _addressLine2,
+                decoration: const InputDecoration(
+                    labelText: 'Village / commune (optional)',
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(14)))),
+                onChanged: (_) => _onDeliveryDetailsChanged()),
             const SizedBox(height: 12),
             TextFormField(
                 controller: _address,
                 minLines: 2,
                 maxLines: 3,
                 decoration: const InputDecoration(
-                    labelText: 'Delivery address',
+                    labelText: 'Street address',
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.all(Radius.circular(14)))),
                 validator: (value) => value == null || value.trim().isEmpty
                     ? 'Enter the delivery address'
-                    : null),
+                    : null,
+                onChanged: (_) => _onDeliveryDetailsChanged()),
             const SizedBox(height: 12),
             TextFormField(
                 controller: _notes,
@@ -430,17 +606,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     padding: const EdgeInsets.all(16),
                     child: Column(children: [
                       _summaryRow('Subtotal', subtotal),
-                      _summaryRow('Delivery', _deliveryFee),
+                      _summaryRow('Delivery', _checkoutDeliveryFee),
                       if (_couponDiscount > 0)
                         _summaryRow('Coupon discount', -_couponDiscount),
                       const Divider(),
-                      _summaryRow(
-                          'Total', subtotal + _deliveryFee - _couponDiscount,
+                      _summaryRow('Total',
+                          subtotal + _checkoutDeliveryFee - _couponDiscount,
                           strong: true)
                     ]))),
             const SizedBox(height: 12),
             FilledButton(
-                onPressed: _submitting ? null : _submit,
+                onPressed:
+                    _submitting || _loadingDelivery || _deliveryError != null
+                        ? null
+                        : _submit,
                 style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16)),
                 child: _submitting

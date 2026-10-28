@@ -10,7 +10,7 @@ class CartView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<ShopState>();
-    if (state.cartLines.isEmpty)
+    if (state.cartLines.isEmpty) {
       return const Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -25,46 +25,96 @@ class CartView extends StatelessWidget {
           ],
         ),
       );
+    }
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         for (final line in state.cartLines)
           Card(
-            child: ListTile(
-              leading: SizedBox(
-                width: 48,
-                height: 48,
-                child: line.product.imageUrl == null
-                    ? const Icon(Icons.spa_outlined)
-                    : Image.network(
-                        line.product.imageUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
-                            const Icon(Icons.spa_outlined),
+            child: Column(
+              children: [
+                ListTile(
+                  leading: SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: line.product.imageUrl == null
+                        ? const Icon(Icons.spa_outlined)
+                        : Image.network(
+                            line.product.imageUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) =>
+                                const Icon(Icons.spa_outlined),
+                          ),
+                  ),
+                  title: Text(
+                    line.product.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(
+                    line.total.toStringAsFixed(2),
+                    style: const TextStyle(
+                      color: brandColor,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        onPressed: () =>
+                            state.setQuantity(line.product, line.quantity - 1),
+                        color: brandColor,
+                        icon: const Icon(Icons.remove_rounded),
                       ),
-              ),
-              title: Text(
-                line.product.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              subtitle: Text('${line.total.toStringAsFixed(2)}'),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    onPressed: () =>
-                        state.setQuantity(line.product, line.quantity - 1),
-                    icon: const Icon(Icons.remove_circle_outline),
+                      Text(
+                        line.quantity.toString(),
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      IconButton(
+                        onPressed: line.product.canAddMore(line.quantity)
+                            ? () => state.setQuantity(
+                                line.product, line.quantity + 1)
+                            : null,
+                        color: brandColor,
+                        disabledColor: const Color(0xFFD0D5DD),
+                        icon: const Icon(Icons.add_rounded),
+                      ),
+                    ],
                   ),
-                  Text('${line.quantity}'),
-                  IconButton(
-                    onPressed: () =>
-                        state.setQuantity(line.product, line.quantity + 1),
-                    icon: const Icon(Icons.add_circle_outline),
+                ),
+                if (!line.product.available ||
+                    line.product.maxOrderQuantity == 0)
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Currently out of stock. Remove this item or try again later.',
+                        style: TextStyle(
+                          color: Color(0xFFB42318),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  )
+                else if (line.product.maxOrderQuantity != null &&
+                    line.quantity >= line.product.maxOrderQuantity!)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Maximum available quantity: ${line.product.maxOrderQuantity}',
+                        style: const TextStyle(
+                          color: Color(0xFF667085),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
                   ),
-                ],
-              ),
+              ],
             ),
           ),
         Card(
@@ -79,7 +129,7 @@ class CartView extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '${state.subtotal.toStringAsFixed(2)}',
+                  state.subtotal.toStringAsFixed(2),
                   style: const TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 18,

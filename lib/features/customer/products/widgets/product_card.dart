@@ -15,12 +15,19 @@ class ProductCard extends StatelessWidget {
     final line = state.cartLines
         .where((item) => item.product.cartKey == product.cartKey)
         .firstOrNull;
-    final favorite = state.wishlistIds.contains(product.id);
     return InkWell(
         onTap: () => Navigator.of(context).push(MaterialPageRoute(
             builder: (_) => ProductDetailScreen(product: product))),
         borderRadius: BorderRadius.circular(18),
         child: Card(
+          margin: EdgeInsets.zero,
+          color: Colors.white,
+          elevation: 1.5,
+          shadowColor: const Color(0x0F101828),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+            side: const BorderSide(color: Color(0xFFF2E8ED)),
+          ),
           clipBehavior: Clip.antiAlias,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -28,7 +35,7 @@ class ProductCard extends StatelessWidget {
               Expanded(
                 child: Container(
                   width: double.infinity,
-                  color: const Color(0xFFF9FAFB),
+                  color: const Color(0xFFFFFBFD),
                   child: Stack(
                     children: [
                       Positioned.fill(
@@ -41,10 +48,11 @@ class ProductCard extends StatelessWidget {
                                 ),
                               )
                             : Padding(
-                                padding: const EdgeInsets.all(8),
+                                padding: const EdgeInsets.all(5),
                                 child: Image.network(
                                   product.imageUrl!,
                                   fit: BoxFit.contain,
+                                  filterQuality: FilterQuality.medium,
                                   errorBuilder: (_, __, ___) => const Center(
                                     child: Icon(
                                       Icons.image_not_supported_outlined,
@@ -60,7 +68,7 @@ class ProductCard extends StatelessWidget {
                           top: 8,
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 9, vertical: 5),
+                                horizontal: 10, vertical: 6),
                             decoration: BoxDecoration(
                                 color: brandColor,
                                 borderRadius: BorderRadius.circular(20)),
@@ -68,57 +76,60 @@ class ProductCard extends StatelessWidget {
                                 '-${((1 - product.price / product.oldPrice!) * 100).round()}%',
                                 style: const TextStyle(
                                     color: Colors.white,
-                                    fontSize: 10,
+                                    fontSize: 11,
                                     fontWeight: FontWeight.w900)),
                           ),
                         ),
-                      Positioned(
-                        right: 6,
-                        top: 6,
-                        child: IconButton.filledTonal(
-                          onPressed: () async {
-                            try {
-                              await context
-                                  .read<ShopState>()
-                                  .toggleWishlist(product);
-                            } catch (_) {}
-                          },
-                          style: IconButton.styleFrom(
-                              backgroundColor: const Color(0xFFFFDFEA),
-                              foregroundColor: brandColor),
-                          icon: Icon(
-                              favorite
-                                  ? Icons.favorite_rounded
-                                  : Icons.favorite_border_rounded,
-                              color: favorite
-                                  ? const Color(0xFFE11D68)
-                                  : const Color(0xFF725A66)),
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ),
+                      if (!product.available || product.maxOrderQuantity == 0)
+                        Positioned(
+                          left: 10,
+                          bottom: 10,
+                          child: _stockBadge(
+                            label: 'Out of stock',
+                            background: const Color(0xFFFEE4E2),
+                            foreground: const Color(0xFFB42318),
+                          ),
+                        )
                     ],
                   ),
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(10, 9, 10, 10),
+                padding: const EdgeInsets.fromLTRB(13, 10, 13, 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      product.brandName.isEmpty
-                          ? product.categoryName.isEmpty
-                              ? 'SHADOW SHOP'
-                              : product.categoryName.toUpperCase()
-                          : product.brandName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 9,
-                        color: Colors.grey.shade600,
-                        letterSpacing: .8,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            product.brandName.isEmpty
+                                ? 'No brand'
+                                : product.brandName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF667085),
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        if (product.rating > 0) ...[
+                          const SizedBox(width: 4),
+                          const Icon(Icons.star_rounded,
+                              size: 14, color: Color(0xFFF4B400)),
+                          const SizedBox(width: 2),
+                          Text(
+                            product.rating.toStringAsFixed(1),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade600,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -126,22 +137,11 @@ class ProductCard extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        height: 1.15,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        height: 1.12,
                       ),
                     ),
-                    if (product.rating > 0)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 5),
-                        child: Row(children: [
-                          const Icon(Icons.star_rounded,
-                              size: 14, color: Color(0xFFF4B400)),
-                          const SizedBox(width: 3),
-                          Text(product.rating.toStringAsFixed(1),
-                              style: TextStyle(
-                                  fontSize: 11, color: Colors.grey.shade600)),
-                        ]),
-                      ),
                     const SizedBox(height: 7),
                     Row(
                       children: [
@@ -153,39 +153,43 @@ class ProductCard extends StatelessWidget {
                                   style: const TextStyle(
                                       color: brandColor,
                                       fontWeight: FontWeight.w900,
-                                      fontSize: 16)),
+                                      fontSize: 18)),
                               if (product.oldPrice != null &&
                                   product.oldPrice! > product.price)
                                 Text(product.oldPrice!.toStringAsFixed(2),
                                     style: TextStyle(
                                         color: Colors.grey.shade500,
-                                        fontSize: 10,
+                                        fontSize: 11,
                                         decoration:
                                             TextDecoration.lineThrough)),
                             ],
                           ),
                         ),
                         if (line == null)
-                          IconButton.filledTonal(
-                            onPressed: product.available && product.stock > 0
-                                ? () => context.read<ShopState>().add(product)
-                                : null,
-                            style: IconButton.styleFrom(
-                                backgroundColor: const Color(0xFFFFDCE8),
-                                foregroundColor: const Color(0xFFD81B60)),
-                            icon: const Icon(Icons.add_rounded, size: 22),
-                            visualDensity: VisualDensity.compact,
+                          SizedBox(
+                            width: 44,
+                            height: 44,
+                            child: IconButton(
+                              onPressed: product.canAddMore(0)
+                                  ? () {
+                                      context.read<ShopState>().add(product);
+                                      showStoreMessage(
+                                        context,
+                                        'Added to cart',
+                                        icon: Icons.check_circle_rounded,
+                                      );
+                                    }
+                                  : null,
+                              style: IconButton.styleFrom(
+                                  foregroundColor: const Color(0xFFD81B60)),
+                              tooltip: 'Add to cart',
+                              icon: const Icon(Icons.add_rounded, size: 24),
+                            ),
                           )
                         else
                           _quantityControl(context, line.quantity),
                       ],
                     ),
-                    if (!product.available || product.stock < 1)
-                      Text(
-                        'Out of stock',
-                        style:
-                            TextStyle(color: Colors.red.shade700, fontSize: 11),
-                      ),
                   ],
                 ),
               ),
@@ -197,22 +201,70 @@ class ProductCard extends StatelessWidget {
   Widget _quantityControl(BuildContext context, int quantity) => Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          IconButton(
+          _quantityButton(
+            icon: Icons.remove,
             onPressed: () =>
                 context.read<ShopState>().setQuantity(product, quantity - 1),
-            icon: const Icon(Icons.remove, size: 18),
-            visualDensity: VisualDensity.compact,
           ),
-          Text('$quantity',
-              style: const TextStyle(fontWeight: FontWeight.bold)),
-          IconButton(
-            onPressed: product.stock > quantity
-                ? () =>
-                    context.read<ShopState>().setQuantity(product, quantity + 1)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Text('$quantity',
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+          ),
+          _quantityButton(
+            icon: Icons.add,
+            onPressed: product.canAddMore(quantity)
+                ? () {
+                    context
+                        .read<ShopState>()
+                        .setQuantity(product, quantity + 1);
+                    showStoreMessage(
+                      context,
+                      'Added to cart',
+                      icon: Icons.check_circle_rounded,
+                    );
+                  }
                 : null,
-            icon: const Icon(Icons.add, size: 18),
-            visualDensity: VisualDensity.compact,
           ),
         ],
+      );
+
+  Widget _stockBadge({
+    required String label,
+    required Color background,
+    required Color foreground,
+  }) =>
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: foreground,
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      );
+
+  Widget _quantityButton({
+    required IconData icon,
+    required VoidCallback? onPressed,
+  }) =>
+      SizedBox(
+        width: 30,
+        height: 34,
+        child: IconButton(
+          onPressed: onPressed,
+          padding: EdgeInsets.zero,
+          icon: Icon(icon, size: 19),
+          color: brandColor,
+          disabledColor: const Color(0xFFD0D5DD),
+          visualDensity: VisualDensity.compact,
+        ),
       );
 }

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shadow_shop_mobile/state/shop_state.dart';
 import 'package:shadow_shop_mobile/features/auth/register_screen.dart';
+import 'widgets/google_auth_button.dart';
+import 'widgets/telegram_auth_button.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -142,6 +144,19 @@ class _LoginScreenState extends State<LoginScreen> {
                               )
                             : const Text('Sign in'),
                       ),
+                      const SizedBox(height: 16),
+                      const Row(
+                        children: [
+                          Expanded(child: GoogleAuthButton()),
+                          SizedBox(width: 16),
+                          Expanded(
+                            child: TelegramAuthButton(
+                              botName: 'YourBotUsername',
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
                       const SizedBox(height: 14),
                       Text(
                         'Use your existing Shadow Shop customer account.',
