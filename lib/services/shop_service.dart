@@ -292,8 +292,8 @@ class ShopService {
 
   Future<Map<String, dynamic>> loginWithGoogle(String idToken) async {
     final response = await api.dio.post(
-      'auth/social/google/',
-      data: {'id_token': idToken},
+      'auth/google/login/',
+      data: {'credential': idToken, 'id_token': idToken},
     );
     final data = Map<String, dynamic>.from(response.data as Map);
     await api.saveTokens(data);
@@ -303,7 +303,7 @@ class ShopService {
   Future<Map<String, dynamic>> loginWithTelegram(
       Map<String, dynamic> authData) async {
     final response = await api.dio.post(
-      'auth/social/telegram/',
+      'auth/telegram/login/',
       data: authData,
     );
     final data = Map<String, dynamic>.from(response.data as Map);

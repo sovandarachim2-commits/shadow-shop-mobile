@@ -6,6 +6,7 @@ import 'package:shadow_shop_mobile/features/customer/rewards/coupons/coupons_pag
 import 'package:shadow_shop_mobile/features/customer/rewards/earn_points/earn_points_page.dart';
 import 'package:shadow_shop_mobile/features/customer/rewards/points_history/points_history_page.dart';
 import 'package:shadow_shop_mobile/features/customer/rewards/redeem/redeem_page.dart';
+import 'package:shadow_shop_mobile/features/auth/auth_modal_sheet.dart';
 import 'package:shadow_shop_mobile/state/shop_state.dart';
 import 'package:shadow_shop_mobile/theme/app_theme.dart';
 
@@ -31,7 +32,8 @@ class _RewardsViewState extends State<RewardsView> {
   @override
   void initState() {
     super.initState();
-    _summary = _loadRewards();
+    final user = context.read<ShopState>().user;
+    _summary = user != null ? _loadRewards() : Future.value({});
   }
 
   Future<Map<String, dynamic>> _loadRewards() {
@@ -179,6 +181,50 @@ class _RewardsViewState extends State<RewardsView> {
 
   @override
   Widget build(BuildContext context) {
+    final user = context.watch<ShopState>().user;
+    if (user == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFCE7F3),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.stars_rounded, size: 48, color: _primaryPink),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'Shadow Shop Rewards',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _textDark),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Sign in to earn points on every order, collect daily check-in gifts, and redeem exclusive coupons & gifts.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: _textMuted, fontSize: 13, height: 1.4),
+              ),
+              const SizedBox(height: 22),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: _primaryPink,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                onPressed: () => showAuthModal(context),
+                icon: const Icon(Icons.login_rounded, size: 20),
+                label: const Text('Sign In / Join Rewards', style: TextStyle(fontWeight: FontWeight.w800)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return FutureBuilder<Map<String, dynamic>>(
       future: _summary,
       builder: (context, snapshot) {

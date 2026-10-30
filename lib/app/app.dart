@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shadow_shop_mobile/features/auth/login_screen.dart';
 import 'package:shadow_shop_mobile/features/customer/home/home_screen.dart';
 import 'package:shadow_shop_mobile/state/shop_state.dart';
 import 'package:shadow_shop_mobile/theme/app_theme.dart';
@@ -133,8 +132,6 @@ class AppGate extends StatelessWidget {
   Widget build(BuildContext context) => Consumer<ShopState>(
         builder: (context, state, _) => !state.sessionChecked
             ? const Scaffold(body: Center(child: CircularProgressIndicator()))
-            : state.user == null
-                ? const LoginScreen()
-                : const HomeScreen(),
+            : const HomeScreen(),
       );
 }

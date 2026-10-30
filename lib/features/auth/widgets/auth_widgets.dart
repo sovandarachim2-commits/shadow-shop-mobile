@@ -1,3 +1,5 @@
+import 'package:provider/provider.dart';
+import 'package:shadow_shop_mobile/state/shop_state.dart';
 import 'package:flutter/material.dart';
 
 // Brand colors: Pink theme matching Shadow Shop app
@@ -61,6 +63,62 @@ class AuthValidator {
     }
     return null;
   }
+}
+
+class StoreLogo extends StatelessWidget {
+  const StoreLogo({
+    super.key,
+    this.size = 48,
+    this.isCircle = true,
+    this.fit,
+    this.borderRadius,
+  });
+
+  final double size;
+  final bool isCircle;
+  final BoxFit? fit;
+  final BorderRadius? borderRadius;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<ShopState>();
+    final logoUrl = state.storeLogoUrl;
+    final effectiveFit = fit ?? (isCircle ? BoxFit.cover : BoxFit.contain);
+
+    Widget imageWidget;
+    if (logoUrl != null && logoUrl.isNotEmpty) {
+      imageWidget = Image.network(
+        logoUrl,
+        width: size,
+        height: size,
+        fit: effectiveFit,
+        errorBuilder: (_, __, ___) => _buildFallback(effectiveFit),
+      );
+    } else {
+      imageWidget = _buildFallback(effectiveFit);
+    }
+
+    if (isCircle) {
+      return ClipOval(child: imageWidget);
+    }
+    final radius = borderRadius ?? BorderRadius.circular(size * 0.22);
+    return ClipRRect(
+      borderRadius: radius,
+      child: imageWidget,
+    );
+  }
+
+  Widget _buildFallback(BoxFit effectiveFit) => Image.asset(
+        isCircle ? 'assets/images/logo_circle.png' : 'assets/images/logo.png',
+        width: size,
+        height: size,
+        fit: effectiveFit,
+        errorBuilder: (_, __, ___) => Icon(
+          Icons.shopping_bag_rounded,
+          size: size * 0.75,
+          color: kAuthPrimary,
+        ),
+      );
 }
 
 class AuthHeader extends StatelessWidget {

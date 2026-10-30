@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -11,6 +11,7 @@ import 'package:shadow_shop_mobile/features/customer/orders/orders_screen.dart';
 import 'package:shadow_shop_mobile/features/customer/rewards/rewards_screen.dart';
 import 'package:shadow_shop_mobile/features/customer/wishlist/wishlist_screen.dart';
 import 'package:shadow_shop_mobile/features/customer/profile/profile_screen.dart';
+import 'package:shadow_shop_mobile/features/auth/auth_modal_sheet.dart';
 import 'package:shadow_shop_mobile/features/customer/products/product_sets/product_sets_page.dart';
 import 'package:shadow_shop_mobile/features/customer/products/product_detail_screen.dart';
 import 'package:shadow_shop_mobile/features/customer/rewards/lucky_box/lucky_box_page.dart';
@@ -122,15 +123,27 @@ class StoreScreenState extends State<HomeScreen> {
                   : _brandTitle(),
           actions: [
             IconButton(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const WishlistView()),
-              ),
+              onPressed: () {
+                if (context.read<ShopState>().user == null) {
+                  showAuthModal(context);
+                } else {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const WishlistView()),
+                  );
+                }
+              },
               style: IconButton.styleFrom(foregroundColor: brandColor),
               icon: const Icon(Icons.favorite_border_rounded),
               tooltip: 'Wishlist',
             ),
             IconButton(
-              onPressed: () => setState(() => _tab = 5),
+              onPressed: () {
+                if (context.read<ShopState>().user == null) {
+                  showAuthModal(context);
+                } else {
+                  setState(() => _tab = 5);
+                }
+              },
               tooltip: 'Account',
               icon: const Icon(Icons.person_outline_rounded),
             ),
@@ -887,13 +900,15 @@ class StoreScreenState extends State<HomeScreen> {
             FutureBuilder<List<Product>>(
               future: _products,
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting)
+                if (snapshot.connectionState == ConnectionState.waiting) {
                   return const SliverFillRemaining(
                     child: Center(child: CircularProgressIndicator()),
                   );
-                if (snapshot.hasError)
+                }
+                if (snapshot.hasError) {
                   return SliverFillRemaining(
                       child: _errorState(snapshot.error));
+                }
                 final products = snapshot.data ?? [];
                 return FutureBuilder<List<Map<String, dynamic>>>(
                   future: _sets,
@@ -974,135 +989,6 @@ class StoreScreenState extends State<HomeScreen> {
           ],
         ),
       );
-
-  Widget _productSetCard(Map<String, dynamic> item) {
-    final id = int.tryParse('${item['id']}') ?? 0;
-    final price = double.tryParse('${item['display_price']}') ?? 0;
-    final setItems = item['items'] is List ? item['items'] as List : const [];
-    final brands = setItems
-        .whereType<Map>()
-        .map((setItem) => '${setItem['brand_name'] ?? ''}'.trim())
-        .where((brand) => brand.isNotEmpty)
-        .toSet()
-        .join(', ');
-    final product = Product(
-      id: id,
-      productSetId: id,
-      isProductSet: true,
-      name: '${item['name'] ?? 'Product set'}',
-      description: '${item['description'] ?? ''}',
-      imageUrl: item['image_url']?.toString(),
-      price: price,
-      oldPrice: double.tryParse('${item['old_price']}'),
-      stock: int.tryParse('${item['current_stock']}') ?? 0,
-      available: item['is_available_for_sale'] != false,
-      availabilityStatus: (item['availability_status'] ?? 'auto').toString(),
-      isFlashSale: item['is_flash_sale_active'] == true,
-      flashSaleMaxOrderQty: int.tryParse('${item['flash_sale_max_order_qty']}'),
-    );
-
-    return Card(
-      margin: EdgeInsets.zero,
-      color: Colors.white,
-      elevation: 1.5,
-      shadowColor: const Color(0x0F101828),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-        side: const BorderSide(color: Color(0xFFF2E8ED)),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Container(
-              width: double.infinity,
-              color: const Color(0xFFFFFBFD),
-              padding: const EdgeInsets.all(5),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: product.imageUrl == null
-                    ? const Icon(
-                        Icons.inventory_2_outlined,
-                        size: 44,
-                        color: brandColor,
-                      )
-                    : Image.network(
-                        product.imageUrl!,
-                        fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => const Icon(
-                          Icons.inventory_2_outlined,
-                          size: 40,
-                          color: brandColor,
-                        ),
-                      ),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(13, 10, 13, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  brands.isEmpty ? 'Product set' : brands,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF667085),
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  product.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    height: 1.12,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '\$${product.price.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          color: brandColor,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: product.canAddMore(0)
-                          ? () {
-                              context.read<ShopState>().add(product);
-                              showStoreMessage(
-                                context,
-                                'Added to cart',
-                                icon: Icons.check_circle_rounded,
-                              );
-                            }
-                          : null,
-                      tooltip: 'Add product set to cart',
-                      color: brandColor,
-                      disabledColor: const Color(0xFFD0D5DD),
-                      icon: const Icon(Icons.add_shopping_cart_rounded),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _homeHeader() => Padding(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),

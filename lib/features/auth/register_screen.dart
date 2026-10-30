@@ -118,7 +118,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
     } catch (error) {
       if (mounted) {
-        showStoreMessage(context, error.toString(), icon: Icons.error_outline_rounded);
+        showStoreMessage(context, friendlyError(error), icon: Icons.error_outline_rounded);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -157,7 +157,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
     } catch (error) {
       if (mounted) {
-        showStoreMessage(context, error.toString(), icon: Icons.error_outline_rounded);
+        showStoreMessage(context, friendlyError(error), icon: Icons.error_outline_rounded);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -185,7 +185,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
     } catch (e) {
       if (mounted) {
-        showStoreMessage(context, e.toString(), icon: Icons.error_outline_rounded);
+        showStoreMessage(context, friendlyError(e), icon: Icons.error_outline_rounded);
       }
     } finally {
       if (mounted) setState(() => _busy = false);

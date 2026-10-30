@@ -18,27 +18,47 @@ class GoogleAuthButton extends StatelessWidget {
       child: InkWell(
         onTap: () async {
           try {
-            final googleSignIn = GoogleSignIn();
+            final googleSignIn = GoogleSignIn(
+              serverClientId:
+                  '668763540471-idel487efgtbu4900h8uh5ph6ptoap4m.apps.googleusercontent.com',
+            );
             final account = await googleSignIn.signIn();
             if (account == null) return;
             final auth = await account.authentication;
-            if (auth.idToken != null) {
-              if (!context.mounted) return;
-              final state = context.read<ShopState>();
-              final success = await state.loginWithGoogle(auth.idToken!);
-              if (!success && context.mounted) {
+            final idToken = auth.idToken;
+            if (idToken == null || idToken.isEmpty) {
+              if (context.mounted) {
                 showStoreMessage(
                   context,
-                  state.error ?? 'Google Sign-In failed',
+                  'Google authentication token was not received. Please try again.',
                   icon: Icons.error_outline_rounded,
                 );
               }
+              return;
+            }
+            if (!context.mounted) return;
+            final state = context.read<ShopState>();
+            final success = await state.loginWithGoogle(idToken);
+            if (!context.mounted) return;
+            if (success) {
+              Navigator.of(context, rootNavigator: true).maybePop(true);
+              showStoreMessage(
+                context,
+                'Welcome, ${state.user?['first_name'] ?? state.user?['username'] ?? 'Customer'}!',
+                icon: Icons.check_circle_rounded,
+              );
+            } else {
+              showStoreMessage(
+                context,
+                state.error ?? 'Google Sign-In failed.',
+                icon: Icons.error_outline_rounded,
+              );
             }
           } catch (e) {
             if (context.mounted) {
               showStoreMessage(
                 context,
-                'Google Sign-In error: $e',
+                friendlyError(e),
                 icon: Icons.error_outline_rounded,
               );
             }

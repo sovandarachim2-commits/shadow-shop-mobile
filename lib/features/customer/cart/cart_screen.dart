@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:shadow_shop_mobile/state/shop_state.dart';
 import 'package:shadow_shop_mobile/theme/app_theme.dart';
 import 'package:shadow_shop_mobile/features/customer/cart/checkout_screen.dart';
+import 'package:shadow_shop_mobile/features/auth/auth_modal_sheet.dart';
 
 class CartView extends StatelessWidget {
   const CartView({super.key});
@@ -10,6 +11,48 @@ class CartView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<ShopState>();
+    if (state.user == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFCE7F3),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.shopping_bag_outlined, size: 48, color: brandColor),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'Sign in to shop',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Please sign in to add products to your cart and checkout.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Color(0xFF64748B), height: 1.4),
+              ),
+              const SizedBox(height: 22),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: brandColor,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                onPressed: () => showAuthModal(context),
+                icon: const Icon(Icons.login_rounded, size: 20),
+                label: const Text('Sign In / Register', style: TextStyle(fontWeight: FontWeight.w800)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     if (state.cartLines.isEmpty) {
       return const Center(
         child: Column(
@@ -141,8 +184,20 @@ class CartView extends StatelessWidget {
           ),
         ),
         FilledButton.icon(
-          onPressed: () => Navigator.of(context)
-              .push(MaterialPageRoute(builder: (_) => const CheckoutScreen())),
+          onPressed: () async {
+            if (state.user == null) {
+              final loggedIn = await showAuthModal(context);
+              if (loggedIn == true && context.mounted) {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const CheckoutScreen()),
+                );
+              }
+            } else {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const CheckoutScreen()),
+              );
+            }
+          },
           icon: const Icon(Icons.lock_outline),
           label: const Text('Continue to checkout'),
         ),

@@ -4,6 +4,7 @@ import '../models/cart_line.dart';
 import '../models/product.dart';
 import '../services/api_client.dart';
 import '../services/shop_service.dart';
+import '../theme/app_theme.dart';
 
 class ShopState extends ChangeNotifier {
   ShopState(this.api) : service = ShopService(api);
@@ -24,8 +25,14 @@ class ShopState extends ChangeNotifier {
   List<CartLine> get cartLines => _cart.values.toList(growable: false);
 
   bool sessionChecked = false;
+  Map<String, dynamic>? siteSettings;
+  String? get storeLogoUrl =>
+      siteSettings?['logo_url'] ?? siteSettings?['login_logo_url'];
 
   Future<void> restoreSession() async {
+    try {
+      siteSettings = await service.siteSettings();
+    } catch (_) {}
     if (!await api.hasToken()) {
       sessionChecked = true;
       notifyListeners();
@@ -170,10 +177,7 @@ class ShopState extends ChangeNotifier {
     notifyListeners();
   }
 
-  static String _message(Object error) {
-    final text = error.toString();
-    return text.startsWith('Exception: ') ? text.substring(11) : text;
-  }
+  static String _message(Object error) => friendlyError(error);
 
   Future<bool> loginWithGoogle(String idToken) async {
     busy = true;

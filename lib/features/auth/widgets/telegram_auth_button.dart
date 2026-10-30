@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'auth_widgets.dart';
+import 'telegram_auth_sheet.dart';
 
 class TelegramAuthButton extends StatelessWidget {
   const TelegramAuthButton({
     super.key,
-    this.botName = 'YourBotUsername',
+    this.botName = 'invoicesheets_bot',
     this.label = 'Telegram',
   });
 
@@ -19,8 +19,7 @@ class TelegramAuthButton extends StatelessWidget {
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: () {
-          final uri = Uri.parse('https://t.me/$botName');
-          launchUrl(uri, mode: LaunchMode.externalApplication);
+          showTelegramAuthSheet(context);
         },
         borderRadius: BorderRadius.circular(14),
         child: Container(

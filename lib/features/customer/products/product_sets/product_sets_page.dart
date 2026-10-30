@@ -1,3 +1,4 @@
+import 'package:shadow_shop_mobile/features/auth/auth_modal_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:shadow_shop_mobile/theme/app_theme.dart';
 import 'package:provider/provider.dart';
@@ -175,6 +176,10 @@ class _ProductSetsPageState extends State<ProductSetsPage> {
                       child: IconButton(
                         onPressed: product.canAddMore(0)
                             ? () {
+                                if (context.read<ShopState>().user == null) {
+                                  showAuthModal(context);
+                                  return;
+                                }
                                 context.read<ShopState>().add(product);
                                 showStoreMessage(
                                   context,

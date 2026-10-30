@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:shadow_shop_mobile/state/shop_state.dart';
 import 'package:shadow_shop_mobile/theme/app_theme.dart';
 import 'package:shadow_shop_mobile/features/customer/orders/order_detail_screen.dart';
+import 'package:shadow_shop_mobile/features/auth/auth_modal_sheet.dart';
 
 class OrdersView extends StatefulWidget {
   const OrdersView({super.key});
@@ -18,7 +19,10 @@ class _OrdersViewState extends State<OrdersView> {
   @override
   void initState() {
     super.initState();
-    _orders = context.read<ShopState>().service.myOrders();
+    final user = context.read<ShopState>().user;
+    _orders = user != null
+        ? context.read<ShopState>().service.myOrders()
+        : Future.value(const []);
   }
 
   bool _isCompleted(Map<String, dynamic> order) {
@@ -27,8 +31,52 @@ class _OrdersViewState extends State<OrdersView> {
   }
 
   @override
-  Widget build(BuildContext context) =>
-      FutureBuilder<List<Map<String, dynamic>>>(
+  Widget build(BuildContext context) {
+    final user = context.watch<ShopState>().user;
+    if (user == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFCE7F3),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.receipt_long_outlined, size: 48, color: brandColor),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'Track your orders',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Sign in to check your order history, delivery status, and invoices.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Color(0xFF64748B), height: 1.4),
+              ),
+              const SizedBox(height: 22),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: brandColor,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                onPressed: () => showAuthModal(context),
+                icon: const Icon(Icons.login_rounded, size: 20),
+                label: const Text('Sign In / Register', style: TextStyle(fontWeight: FontWeight.w800)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return FutureBuilder<List<Map<String, dynamic>>>(
         future: _orders,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -202,7 +250,7 @@ class _OrdersViewState extends State<OrdersView> {
                                               fontWeight: FontWeight.w900)),
                                     ]),
                                     const SizedBox(height: 10),
-                                    Row(
+                                    const Row(
                                         mainAxisAlignment:
                                             MainAxisAlignment.end,
                                         children: [
@@ -211,8 +259,8 @@ class _OrdersViewState extends State<OrdersView> {
                                                   color: brandColor,
                                                   fontWeight: FontWeight.w800,
                                                   fontSize: 12)),
-                                          const SizedBox(width: 4),
-                                          const Icon(
+                                          SizedBox(width: 4),
+                                          Icon(
                                               Icons.arrow_forward_rounded,
                                               color: brandColor,
                                               size: 16),
@@ -229,6 +277,7 @@ class _OrdersViewState extends State<OrdersView> {
           );
         },
       );
+  }
 
   Widget _tabButton(String label, bool completed) {
     final selected = _showCompleted == completed;

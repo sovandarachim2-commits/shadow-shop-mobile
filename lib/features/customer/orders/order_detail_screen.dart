@@ -13,10 +13,12 @@ class OrderDetailScreen extends StatelessWidget {
       body: FutureBuilder<Map<String, dynamic>>(
           future: context.read<ShopState>().service.orderDetail(orderId),
           builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting)
+            if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
-            if (snapshot.hasError)
+            }
+            if (snapshot.hasError) {
               return Center(child: Text(friendlyError(snapshot.error)));
+            }
             final order = snapshot.data ?? {};
             final items = order['items'] as List? ?? const [];
             final history = order['status_history'] as List? ?? const [];

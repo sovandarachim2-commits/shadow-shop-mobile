@@ -90,7 +90,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      showStoreMessage(context, e.toString(), icon: Icons.error_outline_rounded);
+      showStoreMessage(context, friendlyError(e), icon: Icons.error_outline_rounded);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -116,7 +116,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       showStoreMessage(context, msg ?? 'Invalid verification code.', icon: Icons.error_outline_rounded);
     } catch (e) {
       if (!mounted) return;
-      showStoreMessage(context, e.toString(), icon: Icons.error_outline_rounded);
+      showStoreMessage(context, friendlyError(e), icon: Icons.error_outline_rounded);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -142,7 +142,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       showStoreMessage(context, msg ?? 'Failed to reset password.', icon: Icons.error_outline_rounded);
     } catch (e) {
       if (!mounted) return;
-      showStoreMessage(context, e.toString(), icon: Icons.error_outline_rounded);
+      showStoreMessage(context, friendlyError(e), icon: Icons.error_outline_rounded);
     } finally {
       if (mounted) setState(() => _loading = false);
     }

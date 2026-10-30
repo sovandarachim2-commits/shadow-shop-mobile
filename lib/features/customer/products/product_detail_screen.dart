@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shadow_shop_mobile/features/customer/products/widgets/product_card.dart';
 import 'package:shadow_shop_mobile/features/customer/cart/cart_screen.dart';
+import 'package:shadow_shop_mobile/features/auth/auth_modal_sheet.dart';
 import 'package:shadow_shop_mobile/models/product.dart';
 import 'package:shadow_shop_mobile/state/shop_state.dart';
 import 'package:shadow_shop_mobile/theme/app_theme.dart';
@@ -101,6 +102,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           if (!product.isProductSet)
             IconButton(
               onPressed: () async {
+                if (state.user == null) {
+                  await showAuthModal(context);
+                  return;
+                }
                 try {
                   await context.read<ShopState>().toggleWishlist(product);
                   if (!context.mounted) return;
@@ -199,6 +204,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   child: FilledButton(
                     onPressed: canAddSelected
                         ? () {
+                            if (state.user == null) {
+                              showAuthModal(context);
+                              return;
+                            }
                             context.read<ShopState>().setQuantity(
                                   product,
                                   quantity + displayedQuantity,

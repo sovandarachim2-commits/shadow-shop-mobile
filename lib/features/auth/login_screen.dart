@@ -77,15 +77,41 @@ class _LoginScreenState extends State<LoginScreen> {
         state.error ?? 'Unable to sign in. Please check your credentials.',
         icon: Icons.error_outline_rounded,
       );
+    } else if (success && mounted) {
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final isBusy = context.watch<ShopState>().busy;
+    final state = context.watch<ShopState>();
+    final isBusy = state.busy;
+
+    if (state.user != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && Navigator.canPop(context)) {
+          Navigator.pop(context);
+        }
+      });
+    }
 
     return Scaffold(
       backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        leading: Navigator.canPop(context)
+            ? IconButton(
+                icon: const Icon(Icons.close_rounded, size: 26, color: Color(0xFF344054)),
+                tooltip: 'Close',
+                onPressed: () => Navigator.pop(context),
+              )
+            : null,
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(

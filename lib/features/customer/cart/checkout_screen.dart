@@ -840,7 +840,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }
     } catch (error) {
       if (mounted) {
-        showStoreMessage(context, error.toString(), icon: Icons.error_outline_rounded);
+        showStoreMessage(context, friendlyError(error), icon: Icons.error_outline_rounded);
       }
     } finally {
       if (mounted) setState(() => _submitting = false);
