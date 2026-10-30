@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shadow_shop_mobile/features/customer/address/address_book_screen.dart';
 import 'package:shadow_shop_mobile/state/shop_state.dart';
 import 'package:shadow_shop_mobile/theme/app_theme.dart';
 import 'package:shadow_shop_mobile/features/customer/home/home_screen.dart';
@@ -61,83 +62,6 @@ class _ProfileViewState extends State<ProfileView> {
     }
   }
 
-  Future<void> _editAddress() async {
-    final state = context.read<ShopState>();
-    await state.loadAddresses();
-    if (!mounted) return;
-    final fullName = TextEditingController(
-        text: _first.text.trim() +
-            (_last.text.trim().isEmpty ? '' : ' ${_last.text.trim()}'));
-    final phone = TextEditingController(text: _phone.text);
-    final line1 = TextEditingController();
-    final city = TextEditingController();
-    final province = TextEditingController(text: 'Phnom Penh');
-    final saved = await showModalBottomSheet<bool>(
-        context: context,
-        isScrollControlled: true,
-        showDragHandle: true,
-        builder: (sheet) => Padding(
-            padding: EdgeInsets.fromLTRB(
-                20, 12, 20, MediaQuery.of(sheet).viewInsets.bottom + 24),
-            child: SingleChildScrollView(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                  const Text('Add delivery address',
-                      style:
-                          TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                  TextField(
-                      controller: fullName,
-                      decoration:
-                          const InputDecoration(labelText: 'Receiver name')),
-                  TextField(
-                      controller: phone,
-                      decoration: const InputDecoration(labelText: 'Phone')),
-                  TextField(
-                      controller: line1,
-                      decoration:
-                          const InputDecoration(labelText: 'Address line')),
-                  TextField(
-                      controller: city,
-                      decoration:
-                          const InputDecoration(labelText: 'City / district')),
-                  TextField(
-                      controller: province,
-                      decoration:
-                          const InputDecoration(labelText: 'Province / state')),
-                  const SizedBox(height: 14),
-                  FilledButton(
-                      onPressed: () async {
-                        try {
-                          await state.addAddress({
-                            'label': 'home',
-                            'full_name': fullName.text.trim(),
-                            'phone': phone.text.trim(),
-                            'address_line1': line1.text.trim(),
-                            'city': city.text.trim(),
-                            'state': province.text.trim(),
-                            'country': 'Cambodia',
-                            'is_default': state.savedAddresses.isEmpty
-                          });
-                          if (sheet.mounted) Navigator.pop(sheet, true);
-                        } on DioException catch (error) {
-                          if (sheet.mounted)
-                            ScaffoldMessenger.of(sheet).showSnackBar(
-                                SnackBar(content: Text(friendlyError(error))));
-                        }
-                      },
-                      child: const Text('Save address'))
-                ]))));
-    fullName.dispose();
-    phone.dispose();
-    line1.dispose();
-    city.dispose();
-    province.dispose();
-    if (saved == true && mounted)
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Address saved.')));
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -214,7 +138,7 @@ class _ProfileViewState extends State<ProfileView> {
             title: const Text('Delivery addresses'),
             subtitle: Text('${state.savedAddresses.length} saved'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: _editAddress),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddressBookScreen()))),
         ListTile(
             leading: const Icon(Icons.receipt_long_outlined),
             title: const Text('My orders'),

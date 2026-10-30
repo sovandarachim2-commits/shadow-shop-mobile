@@ -49,7 +49,7 @@ class _ProductSetsPageState extends State<ProductSetsPage> {
                 crossAxisCount: 2,
                 mainAxisSpacing: 12,
                 crossAxisSpacing: 12,
-                childAspectRatio: .66,
+                childAspectRatio: .58,
               ),
               itemBuilder: (context, index) => _productSetCard(sets[index]),
             );

@@ -105,7 +105,7 @@ class _WishlistViewState extends State<WishlistView> {
                 crossAxisCount: 2,
                 mainAxisSpacing: 12,
                 crossAxisSpacing: 12,
-                childAspectRatio: .66,
+                childAspectRatio: .58,
               ),
               itemBuilder: (_, index) => ProductCard(product: products[index]),
             );

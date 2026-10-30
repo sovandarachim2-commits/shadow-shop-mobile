@@ -8,14 +8,21 @@ const brandColor = Color(0xFFEC2F83);
 OverlayEntry? _storeMessageEntry;
 Timer? _storeMessageTimer;
 
+void dismissStoreMessage() {
+  _storeMessageTimer?.cancel();
+  _storeMessageTimer = null;
+  if (_storeMessageEntry != null && _storeMessageEntry!.mounted) {
+    _storeMessageEntry!.remove();
+  }
+  _storeMessageEntry = null;
+}
+
 void showStoreMessage(
   BuildContext context,
   String message, {
   required IconData icon,
 }) {
-  _storeMessageTimer?.cancel();
-  _storeMessageEntry?.remove();
-  _storeMessageEntry = null;
+  dismissStoreMessage();
 
   final overlay = Overlay.of(context, rootOverlay: true);
   final media = MediaQuery.of(context);
@@ -72,6 +79,19 @@ void showStoreMessage(
                         ),
                       ),
                     ),
+                    const SizedBox(width: 8),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: dismissStoreMessage,
+                      child: const Padding(
+                        padding: EdgeInsets.all(4),
+                        child: Icon(
+                          Icons.close_rounded,
+                          size: 18,
+                          color: Color(0xFF98A2B3),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -84,9 +104,11 @@ void showStoreMessage(
 
   overlay.insert(entry);
   _storeMessageEntry = entry;
-  _storeMessageTimer = Timer(const Duration(seconds: 2), () {
+  _storeMessageTimer = Timer(const Duration(seconds: 3), () {
     if (_storeMessageEntry == entry) {
-      entry.remove();
+      if (entry.mounted) {
+        entry.remove();
+      }
       _storeMessageEntry = null;
     }
   });

@@ -144,6 +144,21 @@ class ShopState extends ChangeNotifier {
     await loadAddresses();
   }
 
+  Future<void> updateAddress(int id, Map<String, dynamic> address) async {
+    await service.updateAddress(id, address);
+    await loadAddresses();
+  }
+
+  Future<void> deleteAddress(int id) async {
+    await service.deleteAddress(id);
+    await loadAddresses();
+  }
+
+  Future<void> setDefaultAddress(int id) async {
+    await service.setDefaultAddress(id);
+    await loadAddresses();
+  }
+
   Future<void> updateProfile(Map<String, dynamic> payload) async {
     user = await service.updateProfile(payload);
     notifyListeners();

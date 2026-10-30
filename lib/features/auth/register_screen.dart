@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shadow_shop_mobile/state/shop_state.dart';
 import 'package:shadow_shop_mobile/theme/app_theme.dart';
+import 'widgets/auth_widgets.dart';
 import 'widgets/google_auth_button.dart';
 import 'widgets/telegram_auth_button.dart';
 
@@ -14,72 +16,176 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  final _form = GlobalKey<FormState>();
-  final _fullName = TextEditingController();
-  final _email = TextEditingController();
-  final _password = TextEditingController();
-  final _confirm = TextEditingController();
-  final _code = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  final _fullNameCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _usernameCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  final _confirmCtrl = TextEditingController();
+  final _codeCtrl = TextEditingController();
+
+  bool _agreeTerms = false;
   bool _codeSent = false;
   bool _busy = false;
-  bool _obscurePassword = true;
-  bool _obscureConfirm = true;
+  int _resendCountdown = 0;
+  Timer? _countdownTimer;
 
   @override
   void dispose() {
-    _fullName.dispose();
-    _email.dispose();
-    _password.dispose();
-    _confirm.dispose();
-    _code.dispose();
+    _fullNameCtrl.dispose();
+    _phoneCtrl.dispose();
+    _usernameCtrl.dispose();
+    _emailCtrl.dispose();
+    _passwordCtrl.dispose();
+    _confirmCtrl.dispose();
+    _codeCtrl.dispose();
+    _countdownTimer?.cancel();
     super.dispose();
   }
 
-  Future<void> _submit() async {
+  void _startResendTimer([int seconds = 45]) {
+    _countdownTimer?.cancel();
+    setState(() => _resendCountdown = seconds);
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_resendCountdown > 1) {
+        setState(() => _resendCountdown--);
+      } else {
+        setState(() => _resendCountdown = 0);
+        timer.cancel();
+      }
+    });
+  }
+
+  Future<void> _handleRegister() async {
     if (_busy) return;
-    if (!(_form.currentState?.validate() ?? false)) return;
+    if (!_formKey.currentState!.validate()) return;
+    if (!_agreeTerms) {
+      showStoreMessage(
+        context,
+        'Please agree to the Terms & Conditions to continue.',
+        icon: Icons.info_outline_rounded,
+      );
+      return;
+    }
+
     setState(() => _busy = true);
     try {
       final service = context.read<ShopState>().service;
-      if (!_codeSent) {
-        final nameParts = _fullName.text.trim().split(RegExp(r'\s+'));
-        final result = await service.register({
-          'first_name': nameParts.first,
-          'last_name': nameParts.skip(1).join(' '),
-          'email': _email.text.trim(),
-          'password': _password.text,
-          'confirm_password': _confirm.text,
-        });
-        if (!mounted) return;
-        setState(() => _codeSent = true);
-        if (result['detail'] != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${result['detail']}')),
-          );
-        }
-      } else {
-        await service.confirmRegistration(
-            _email.text.trim(), _code.text.trim());
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Account verified. Please sign in.')),
-          );
-          Navigator.pop(context);
-        }
-      }
+      final nameParts = _fullNameCtrl.text.trim().split(RegExp(r'\s+'));
+      final firstName = nameParts.first;
+      final lastName = nameParts.length > 1 ? nameParts.skip(1).join(' ') : firstName;
+
+      final result = await service.register({
+        'first_name': firstName,
+        'last_name': lastName,
+        'phone': _phoneCtrl.text.trim(),
+        'username': _usernameCtrl.text.trim(),
+        'email': _emailCtrl.text.trim(),
+        'password': _passwordCtrl.text,
+        'confirm_password': _confirmCtrl.text,
+      });
+
+      if (!mounted) return;
+      _startResendTimer(45);
+      setState(() => _codeSent = true);
+      showStoreMessage(
+        context,
+        result['detail']?.toString() ?? 'Verification code sent to your email.',
+        icon: Icons.check_circle_rounded,
+      );
     } on DioException catch (error) {
       final body = error.response?.data;
-      final message = body is Map
-          ? (body['detail'] ?? body.values.first).toString()
-          : 'Registration could not be completed.';
+      String message = 'Registration failed. Please try again.';
+      if (body is Map) {
+        if (body['detail'] != null) {
+          message = body['detail'].toString();
+        } else if (body.isNotEmpty) {
+          final firstVal = body.values.first;
+          if (firstVal is List && firstVal.isNotEmpty) {
+            message = '${body.keys.first}: ${firstVal.first}';
+          } else {
+            message = '$firstVal';
+          }
+        }
+      }
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(message)));
+        showStoreMessage(context, message, icon: Icons.error_outline_rounded);
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(error.toString())));
+        showStoreMessage(context, error.toString(), icon: Icons.error_outline_rounded);
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _handleVerifyCode() async {
+    final code = _codeCtrl.text.trim();
+    if (code.length != 4) {
+      showStoreMessage(context, 'Please enter the 4-digit code.', icon: Icons.error_outline_rounded);
+      return;
+    }
+
+    setState(() => _busy = true);
+    try {
+      final state = context.read<ShopState>();
+      await state.service.confirmRegistration(_emailCtrl.text.trim(), code);
+      if (!mounted) return;
+
+      // Automatically sign in with credentials after verification
+      final autoLoginOk = await state.login(_emailCtrl.text.trim(), _passwordCtrl.text);
+      if (!mounted) return;
+
+      if (autoLoginOk) {
+        Navigator.pop(context); // back to home
+        showStoreMessage(context, 'Account created and verified successfully!', icon: Icons.celebration_rounded);
+      } else {
+        showStoreMessage(context, 'Account verified! Please sign in.', icon: Icons.check_circle_rounded);
+        Navigator.pop(context);
+      }
+    } on DioException catch (error) {
+      final body = error.response?.data;
+      final msg = body is Map ? (body['detail'] ?? body.values.first).toString() : 'Invalid verification code.';
+      if (mounted) {
+        showStoreMessage(context, msg, icon: Icons.error_outline_rounded);
+      }
+    } catch (error) {
+      if (mounted) {
+        showStoreMessage(context, error.toString(), icon: Icons.error_outline_rounded);
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _handleResend() async {
+    if (_resendCountdown > 0 || _busy) return;
+    setState(() => _busy = true);
+    try {
+      final service = context.read<ShopState>().service;
+      final res = await service.resendRegistrationCode(_emailCtrl.text.trim());
+      if (!mounted) return;
+      _startResendTimer(45);
+      showStoreMessage(
+        context,
+        res['detail']?.toString() ?? 'New code sent to your email.',
+        icon: Icons.check_circle_rounded,
+      );
+    } on DioException catch (e) {
+      final body = e.response?.data;
+      final msg = body is Map ? body['detail']?.toString() : null;
+      if (mounted) {
+        showStoreMessage(context, msg ?? 'Could not resend code.', icon: Icons.error_outline_rounded);
+      }
+    } catch (e) {
+      if (mounted) {
+        showStoreMessage(context, e.toString(), icon: Icons.error_outline_rounded);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -88,384 +194,296 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isVerifying = _codeSent;
-
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-          title: Text(isVerifying ? 'Verify your email' : 'Create account')),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: kAuthTextDark, size: 18),
+          onPressed: () {
+            if (_codeSent) {
+              setState(() => _codeSent = false);
+            } else {
+              Navigator.pop(context);
+            }
+          },
+        ),
+      ),
       body: SafeArea(
-        top: false,
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 480),
-              child: Form(
-                key: _form,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Container(
-                      height: 64,
-                      width: 64,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [brandColor, Color(0xFFD629D7)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color(0x26EC2F83),
-                            blurRadius: 18,
-                            offset: Offset(0, 7),
-                          ),
-                        ],
-                      ),
-                      child: Icon(
-                        isVerifying
-                            ? Icons.mark_email_read_outlined
-                            : Icons.person_add_alt_1,
-                        color: Colors.white,
-                        size: 30,
-                      ),
-                    ),
-                    const SizedBox(height: 22),
-                    Text(
-                      isVerifying ? 'Check your inbox' : 'Join Shadow Shop',
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w900,
-                        height: 1.15,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      isVerifying
-                          ? 'We sent a 4-digit verification code to ${_email.text.trim()}.'
-                          : 'Create an account to discover your next favorite thing.',
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 15,
-                        height: 1.45,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Row(
-                      children: [
-                        _StepIndicator(
-                          number: '1',
-                          label: 'Your details',
-                          active: !isVerifying,
-                          complete: isVerifying,
-                        ),
-                        Expanded(
-                          child: Container(
-                            height: 2,
-                            margin: const EdgeInsets.only(bottom: 20),
-                            color: isVerifying
-                                ? brandColor
-                                : const Color(0xFFE4E7EC),
-                          ),
-                        ),
-                        _StepIndicator(
-                          number: '2',
-                          label: 'Verify email',
-                          active: isVerifying,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(22),
-                        border: Border.all(color: const Color(0xFFF0F1F4)),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color(0x0C101828),
-                            blurRadius: 24,
-                            offset: Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          if (!isVerifying) ...[
-                            const Text(
-                              'Your details',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            TextFormField(
-                              controller: _fullName,
-                              textCapitalization: TextCapitalization.words,
-                              textInputAction: TextInputAction.next,
-                              autofillHints: const [AutofillHints.name],
-                              decoration: const InputDecoration(
-                                labelText: 'Full name',
-                                prefixIcon: Icon(Icons.person_outline),
-                              ),
-                              validator: (value) =>
-                                  value == null || value.trim().isEmpty
-                                      ? 'Enter your full name'
-                                      : null,
-                            ),
-                            const SizedBox(height: 14),
-                            TextFormField(
-                              controller: _email,
-                              keyboardType: TextInputType.emailAddress,
-                              textInputAction: TextInputAction.next,
-                              autofillHints: const [AutofillHints.email],
-                              decoration: const InputDecoration(
-                                labelText: 'Email address',
-                                prefixIcon: Icon(Icons.mail_outline),
-                              ),
-                              validator: (value) =>
-                                  value == null || !value.contains('@')
-                                      ? 'Enter a valid email'
-                                      : null,
-                            ),
-                            const SizedBox(height: 14),
-                            TextFormField(
-                              controller: _password,
-                              obscureText: _obscurePassword,
-                              textInputAction: TextInputAction.next,
-                              autofillHints: const [AutofillHints.newPassword],
-                              decoration: InputDecoration(
-                                labelText: 'Password',
-                                prefixIcon: const Icon(Icons.lock_outline),
-                                suffixIcon: IconButton(
-                                  tooltip: _obscurePassword
-                                      ? 'Show password'
-                                      : 'Hide password',
-                                  onPressed: () => setState(() =>
-                                      _obscurePassword = !_obscurePassword),
-                                  icon: Icon(
-                                    _obscurePassword
-                                        ? Icons.visibility_outlined
-                                        : Icons.visibility_off_outlined,
-                                  ),
-                                ),
-                              ),
-                              validator: (value) =>
-                                  value == null || value.length < 8
-                                      ? 'Use at least 8 characters'
-                                      : null,
-                            ),
-                            const SizedBox(height: 14),
-                            TextFormField(
-                              controller: _confirm,
-                              obscureText: _obscureConfirm,
-                              textInputAction: TextInputAction.done,
-                              onFieldSubmitted: (_) => _submit(),
-                              decoration: InputDecoration(
-                                labelText: 'Confirm password',
-                                prefixIcon: const Icon(Icons.lock_outline),
-                                suffixIcon: IconButton(
-                                  tooltip: _obscureConfirm
-                                      ? 'Show password'
-                                      : 'Hide password',
-                                  onPressed: () => setState(
-                                      () => _obscureConfirm = !_obscureConfirm),
-                                  icon: Icon(
-                                    _obscureConfirm
-                                        ? Icons.visibility_outlined
-                                        : Icons.visibility_off_outlined,
-                                  ),
-                                ),
-                              ),
-                              validator: (value) => value != _password.text
-                                  ? 'Passwords do not match'
-                                  : null,
-                            ),
-                          ] else ...[
-                            const Icon(
-                              Icons.mark_email_read_outlined,
-                              color: brandColor,
-                              size: 42,
-                            ),
-                            const SizedBox(height: 14),
-                            TextFormField(
-                              controller: _code,
-                              autofocus: true,
-                              keyboardType: TextInputType.number,
-                              textAlign: TextAlign.center,
-                              maxLength: 4,
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 12,
-                              ),
-                              decoration: const InputDecoration(
-                                labelText: '4-digit code',
-                                hintText: '••••',
-                                counterText: '',
-                                prefixIcon: Icon(Icons.password_outlined),
-                              ),
-                              validator: (value) =>
-                                  value == null || value.trim().length != 4
-                                      ? 'Enter the 4 digit code'
-                                      : null,
-                            ),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: TextButton.icon(
-                                onPressed: _busy
-                                    ? null
-                                    : () => setState(() => _codeSent = false),
-                                icon: const Icon(Icons.edit_outlined, size: 18),
-                                label: const Text('Change email or details'),
-                              ),
-                            ),
-                          ],
-                          const SizedBox(height: 18),
-                          FilledButton(
-                            onPressed: _busy ? null : _submit,
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size.fromHeight(52),
-                              textStyle: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            child: _busy
-                                ? const SizedBox(
-                                    height: 22,
-                                    width: 22,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(isVerifying
-                                          ? 'Verify email'
-                                          : 'Create account'),
-                                      const SizedBox(width: 8),
-                                      const Icon(Icons.arrow_forward, size: 18),
-                                    ],
-                                  ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (!isVerifying) ...[
-                      const SizedBox(height: 22),
-                      Row(
-                        children: [
-                          const Expanded(child: Divider()),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 14),
-                            child: Text(
-                              'OR SIGN UP WITH',
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 1,
-                              ),
-                            ),
-                          ),
-                          const Expanded(child: Divider()),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      const Row(
-                        children: [
-                          Expanded(child: GoogleAuthButton()),
-                          SizedBox(width: 12),
-                          Expanded(
-                            child: TelegramAuthButton(
-                              botName: 'YourBotUsername',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                    const SizedBox(height: 20),
-                    Wrap(
-                      alignment: WrapAlignment.center,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Text(
-                          'Already have an account?',
-                          style: TextStyle(color: Colors.grey.shade700),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('Sign in'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: _codeSent ? _buildVerifyStep() : _buildRegisterStep(),
             ),
           ),
         ),
       ),
     );
   }
-}
 
-class _StepIndicator extends StatelessWidget {
-  const _StepIndicator({
-    required this.number,
-    required this.label,
-    this.active = false,
-    this.complete = false,
-  });
-
-  final String number;
-  final String label;
-  final bool active;
-  final bool complete;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = active || complete ? brandColor : const Color(0xFF98A2B3);
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+  Widget _buildRegisterStep() {
+    return Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          CircleAvatar(
-            radius: 13,
-            backgroundColor: active || complete
-                ? const Color(0xFFFCE7F1)
-                : const Color(0xFFF2F4F7),
-            child: complete
-                ? const Icon(Icons.check, color: brandColor, size: 15)
-                : Text(
-                    number,
-                    style: TextStyle(
-                      color: color,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
+          const AuthHeader(
+            title: 'Create Account',
+            subtitle: 'Join Shadow Shop for exclusive member pricing, vouchers, and rewards.',
+            showLogo: false,
+          ),
+          const SizedBox(height: 28),
+
+          // Full Name
+          CustomTextField(
+            controller: _fullNameCtrl,
+            label: 'Full Name',
+            hintText: 'John Doe',
+            prefixIcon: Icons.person_outline_rounded,
+            validator: (v) => AuthValidator.required(v, 'Enter your full name'),
+            autofillHints: const [AutofillHints.name],
+          ),
+          const SizedBox(height: 16),
+
+          // Phone Number
+          CustomTextField(
+            controller: _phoneCtrl,
+            label: 'Phone Number',
+            hintText: '012 345 678',
+            prefixIcon: Icons.phone_outlined,
+            keyboardType: TextInputType.phone,
+            validator: AuthValidator.phone,
+            autofillHints: const [AutofillHints.telephoneNumber],
+          ),
+          const SizedBox(height: 16),
+
+          // Username (after Phone Number)
+          CustomTextField(
+            controller: _usernameCtrl,
+            label: 'Username',
+            hintText: 'Enter your username',
+            prefixIcon: Icons.alternate_email_rounded,
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return 'Enter your username';
+              if (v.trim().length < 3) return 'Username must be at least 3 characters';
+              return null;
+            },
+            autofillHints: const [AutofillHints.username],
+          ),
+          const SizedBox(height: 16),
+
+          // Email
+          CustomTextField(
+            controller: _emailCtrl,
+            label: 'Email Address',
+            hintText: 'name@example.com',
+            prefixIcon: Icons.email_outlined,
+            keyboardType: TextInputType.emailAddress,
+            validator: AuthValidator.email,
+            autofillHints: const [AutofillHints.email],
+          ),
+          const SizedBox(height: 16),
+
+          // Password
+          PasswordTextField(
+            controller: _passwordCtrl,
+            label: 'Password',
+            hintText: 'Minimum 8 characters',
+            validator: (v) => AuthValidator.password(v, minLength: 8),
+            textInputAction: TextInputAction.next,
+          ),
+          const SizedBox(height: 16),
+
+          // Confirm Password
+          PasswordTextField(
+            controller: _confirmCtrl,
+            label: 'Confirm Password',
+            hintText: 'Re-enter your password',
+            validator: (v) => AuthValidator.confirmPassword(v, _passwordCtrl.text),
+            textInputAction: TextInputAction.done,
+            onFieldSubmitted: (_) => _handleRegister(),
+          ),
+          const SizedBox(height: 16),
+
+          // Terms and Conditions checkbox
+          InkWell(
+            onTap: () => setState(() => _agreeTerms = !_agreeTerms),
+            borderRadius: BorderRadius.circular(6),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: Checkbox(
+                    value: _agreeTerms,
+                    activeColor: kAuthPrimary,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                    onChanged: (val) => setState(() => _agreeTerms = val ?? true),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text.rich(
+                    TextSpan(
+                      text: 'I agree to the ',
+                      style: TextStyle(fontSize: 13, color: kAuthTextMuted, height: 1.4),
+                      children: [
+                        TextSpan(
+                          text: 'Terms of Service',
+                          style: TextStyle(
+                            color: kAuthPrimary,
+                            fontWeight: FontWeight.w700,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                        TextSpan(text: ' and '),
+                        TextSpan(
+                          text: 'Privacy Policy',
+                          style: TextStyle(
+                            color: kAuthPrimary,
+                            fontWeight: FontWeight.w700,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-          ),
-          const SizedBox(width: 7),
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
+                ),
+              ],
             ),
+          ),
+          const SizedBox(height: 24),
+
+          // Create Account Button
+          PrimaryAuthButton(
+            label: 'Create Account',
+            isLoading: _busy,
+            onPressed: _handleRegister,
+          ),
+          const SizedBox(height: 24),
+
+          // Divider
+          const AuthDivider(),
+          const SizedBox(height: 20),
+
+          // Social registration options
+          const Row(
+            children: [
+              Expanded(child: GoogleAuthButton(label: 'Google')),
+              SizedBox(width: 12),
+              Expanded(
+                child: TelegramAuthButton(
+                  botName: 'ShadowShopBot',
+                  label: 'Telegram',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 28),
+
+          // Navigate to Login
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text(
+                'Already have an account?',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: kAuthTextMuted,
+                ),
+              ),
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: const Text(
+                  'Sign In',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                    color: kAuthSecondary,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildVerifyStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AuthHeader(
+          title: 'Check Your Email',
+          subtitle: 'We sent a 4-digit verification code to ${_emailCtrl.text.trim()}. Enter it below to activate your account.',
+          badgeIcon: Icons.mark_email_read_outlined,
+        ),
+        const SizedBox(height: 32),
+        CustomTextField(
+          controller: _codeCtrl,
+          label: '4-Digit Verification Code',
+          hintText: '1234',
+          prefixIcon: Icons.pin_rounded,
+          keyboardType: TextInputType.number,
+          validator: (val) {
+            if (val == null || val.trim().length != 4) {
+              return 'Enter the 4-digit code';
+            }
+            return null;
+          },
+          onFieldSubmitted: (_) => _handleVerifyCode(),
+        ),
+        const SizedBox(height: 14),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Didn\'t receive code?',
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+            ),
+            TextButton(
+              onPressed: _resendCountdown > 0 || _busy ? null : _handleResend,
+              child: Text(
+                _resendCountdown > 0 ? 'Resend in ${_resendCountdown}s' : 'Resend Code',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: _resendCountdown > 0 ? Colors.grey : kAuthPrimary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        PrimaryAuthButton(
+          label: 'Verify & Continue',
+          isLoading: _busy,
+          onPressed: _handleVerifyCode,
+        ),
+        const SizedBox(height: 16),
+        Center(
+          child: TextButton.icon(
+            onPressed: () => setState(() => _codeSent = false),
+            icon: const Icon(Icons.edit_outlined, size: 16, color: kAuthPrimary),
+            label: const Text(
+              'Change Registration Details',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: kAuthPrimary,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

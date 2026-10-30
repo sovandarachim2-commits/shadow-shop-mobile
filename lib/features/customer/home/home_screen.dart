@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -286,102 +286,165 @@ class StoreScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _bottomNavigation() => SafeArea(
-        top: false,
-        child: Container(
-          height: 76,
-          decoration: BoxDecoration(
+  Widget _bottomNavigation() {
+    final cartCount = context.watch<ShopState>().itemCount;
+    const navActiveColor = Color(0xFFEC4899);
+    const navInactiveColor = Color(0xFF64748B);
+
+    return SafeArea(
+      top: false,
+      child: Container(
+        height: 68,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: const Border(top: BorderSide(color: Color(0xFFF1F5F9), width: 1.5)),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0F172A).withValues(alpha: 0.05),
+              blurRadius: 16,
+              offset: const Offset(0, -3),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            _navItem(0, 'Home', Icons.home_outlined, Icons.home_rounded, navActiveColor, navInactiveColor),
+            _navItem(1, 'Products', Icons.shopping_bag_outlined, Icons.shopping_bag_rounded, navActiveColor, navInactiveColor),
+            _navItem(2, 'Rewards', Icons.redeem_outlined, Icons.redeem_rounded, navActiveColor, navInactiveColor),
+            _navItem(
+              3,
+              'Cart',
+              Icons.shopping_cart_outlined,
+              Icons.shopping_cart_rounded,
+              navActiveColor,
+              navInactiveColor,
+              badgeCount: cartCount,
+            ),
+            _navItem(
+              4,
+              'My Orders',
+              null,
+              null,
+              navActiveColor,
+              navInactiveColor,
+              customIcon: (color, selected) => _buildPackageCheckIcon(color: color, selected: selected),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _navItem(
+    int index,
+    String label,
+    IconData? icon,
+    IconData? activeIcon,
+    Color activeColor,
+    Color inactiveColor, {
+    int badgeCount = 0,
+    Widget Function(Color color, bool selected)? customIcon,
+  }) {
+    final selected = _tab == index;
+    final color = selected ? activeColor : inactiveColor;
+
+    Widget iconWidget = customIcon != null
+        ? customIcon(color, selected)
+        : Icon(selected ? activeIcon : icon, size: 22, color: color);
+
+    if (badgeCount > 0) {
+      iconWidget = Badge(
+        label: Text(
+          '$badgeCount',
+          style: const TextStyle(
             color: Colors.white,
-            border: const Border(top: BorderSide(color: Color(0xFFF2DDE8))),
-            boxShadow: [
-              BoxShadow(
-                  color: Colors.black.withValues(alpha: .06),
-                  blurRadius: 18,
-                  offset: const Offset(0, -5))
-            ],
+            fontSize: 9,
+            fontWeight: FontWeight.w800,
           ),
-          child: Stack(clipBehavior: Clip.none, children: [
-            Row(children: [
-              _navItem(0, 'Home', Icons.home_outlined, Icons.home_rounded),
-              _navItem(1, 'Products', Icons.shopping_bag_outlined,
-                  Icons.shopping_bag_rounded),
-              const SizedBox(width: 62),
-              _navItem(3, 'Cart', Icons.shopping_bag_outlined,
-                  Icons.shopping_bag_rounded),
-              _navItem(4, 'My Orders', Icons.inventory_2_outlined,
-                  Icons.inventory_2_rounded),
-            ]),
-            Positioned(
-              top: -20,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: InkWell(
-                  onTap: () => setState(() => _tab = 2),
-                  borderRadius: BorderRadius.circular(40),
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: const LinearGradient(
-                            colors: [Color(0xFFF24792), Color(0xFFD629D7)]),
-                        border: Border.all(color: Colors.white, width: 5),
-                        boxShadow: const [
-                          BoxShadow(
-                              color: Color(0x30EC2F83),
-                              blurRadius: 22,
-                              spreadRadius: 3)
-                        ],
-                      ),
-                      child: const Icon(Icons.card_giftcard_rounded,
-                          color: Colors.white, size: 25),
-                    ),
-                    const SizedBox(height: 2),
-                    Text('Rewards',
-                        style: TextStyle(
-                            fontSize: 10,
-                            fontWeight:
-                                _tab == 2 ? FontWeight.w800 : FontWeight.w600,
-                            color: _tab == 2
-                                ? brandColor
-                                : const Color(0xFF667085))),
-                  ]),
+        ),
+        backgroundColor: activeColor,
+        offset: const Offset(6, -4),
+        child: iconWidget,
+      );
+    }
+
+    return Expanded(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => setState(() => _tab = index),
+          splashColor: activeColor.withValues(alpha: 0.08),
+          highlightColor: Colors.transparent,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  height: 24,
+                  child: Center(child: iconWidget),
                 ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                    color: color,
+                    height: 1.1,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: selected ? 14 : 0,
+                  height: 2.5,
+                  decoration: BoxDecoration(
+                    color: selected ? activeColor : Colors.transparent,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPackageCheckIcon({required Color color, required bool selected}) {
+    return SizedBox(
+      width: 24,
+      height: 24,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          Icon(
+            selected ? Icons.inventory_2_rounded : Icons.inventory_2_outlined,
+            size: 23,
+            color: color,
+          ),
+          Positioned(
+            right: -2,
+            bottom: -2,
+            child: Container(
+              padding: const EdgeInsets.all(1),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.check_circle_rounded,
+                size: 11,
+                color: color,
               ),
             ),
-          ]),
-        ),
-      );
-
-  Widget _navItem(int index, String label, IconData icon, IconData activeIcon) {
-    final selected = _tab == index;
-    return Expanded(
-      child: InkWell(
-        onTap: () => setState(() => _tab = index),
-        child: Padding(
-          padding: const EdgeInsets.only(top: 8, bottom: 5),
-          child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
-            Icon(selected ? activeIcon : icon,
-                size: 23,
-                color: selected ? brandColor : const Color(0xFF667085)),
-            const SizedBox(height: 3),
-            Text(label,
-                style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                    color: selected ? brandColor : const Color(0xFF667085))),
-            const SizedBox(height: 3),
-            AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                width: selected ? 18 : 0,
-                height: 3,
-                decoration: BoxDecoration(
-                    color: selected ? brandColor : Colors.transparent,
-                    borderRadius: BorderRadius.circular(4))),
-          ]),
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -594,7 +657,7 @@ class StoreScreenState extends State<HomeScreen> {
         children: [
           _sectionHeading('Promotions', icon: Icons.card_giftcard_outlined),
           SizedBox(
-            height: 174,
+            height: 200,
             child: PageView.builder(
               itemCount: banners.length,
               onPageChanged: (index) => setState(() => _bannerIndex = index),
@@ -701,7 +764,7 @@ class StoreScreenState extends State<HomeScreen> {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       _sectionHeading(title, icon: icon, color: accent),
       SizedBox(
-        height: cardWidth * 1.48,
+        height: cardWidth + 115,
         child: ListView.separated(
           padding: const EdgeInsets.symmetric(horizontal: 14),
           scrollDirection: Axis.horizontal,
@@ -886,7 +949,7 @@ class StoreScreenState extends State<HomeScreen> {
                               crossAxisCount: 2,
                               mainAxisSpacing: 12,
                               crossAxisSpacing: 12,
-                              childAspectRatio: .66,
+                              childAspectRatio: .58,
                             ),
                             itemCount: sets.length + products.length,
                             itemBuilder: (context, index) {

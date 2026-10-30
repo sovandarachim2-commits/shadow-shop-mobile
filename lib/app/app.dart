@@ -106,6 +106,8 @@ class ShadowShopApp extends StatelessWidget {
           ),
           snackBarTheme: SnackBarThemeData(
             behavior: SnackBarBehavior.floating,
+            showCloseIcon: true,
+            closeIconColor: Colors.white70,
             backgroundColor: const Color(0xFF1D2939),
             contentTextStyle: const TextStyle(color: Colors.white),
             shape:

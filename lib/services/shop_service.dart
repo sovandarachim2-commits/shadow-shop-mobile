@@ -40,6 +40,20 @@ class ShopService {
     return Map<String, dynamic>.from(response.data as Map);
   }
 
+  Future<Map<String, dynamic>> updateAddress(
+      int id, Map<String, dynamic> payload) async {
+    final response = await api.dio.patch('auth/addresses/$id/', data: payload);
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<void> deleteAddress(int id) async {
+    await api.dio.delete('auth/addresses/$id/');
+  }
+
+  Future<void> setDefaultAddress(int id) async {
+    await api.dio.post('auth/addresses/$id/set_default/');
+  }
+
   Future<Map<String, dynamic>> updateProfile(
       Map<String, dynamic> payload) async {
     final response = await api.dio.patch('auth/me/', data: payload);
@@ -74,6 +88,48 @@ class ShopService {
   Future<void> confirmRegistration(String email, String code) async {
     await api.dio
         .post('auth/email/verify-code/', data: {'email': email, 'code': code});
+  }
+
+  Future<Map<String, dynamic>> resendRegistrationCode(String email) async {
+    final response = await api.dio.post(
+      'auth/email/resend-code/',
+      data: {'email': email.trim()},
+    );
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<Map<String, dynamic>> requestPasswordReset(String email) async {
+    final response = await api.dio.post(
+      'auth/password/forgot/',
+      data: {'email': email.trim()},
+    );
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<Map<String, dynamic>> verifyPasswordResetCode(String email, String code) async {
+    final response = await api.dio.post(
+      'auth/password/verify-code/',
+      data: {'email': email.trim(), 'code': code.trim()},
+    );
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<Map<String, dynamic>> resetPassword({
+    required String email,
+    required String code,
+    required String password,
+    required String confirmPassword,
+  }) async {
+    final response = await api.dio.post(
+      'auth/password/reset/',
+      data: {
+        'email': email.trim(),
+        'code': code.trim(),
+        'password': password,
+        'confirm_password': confirmPassword,
+      },
+    );
+    return Map<String, dynamic>.from(response.data as Map);
   }
 
   Future<Map<String, dynamic>> verifyOrder(String reference,

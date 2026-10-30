@@ -26,24 +26,25 @@ class ProductCard extends StatelessWidget {
                   product: product,
                   setItems: setItems,
                 ))),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.zero,
         child: Card(
           margin: EdgeInsets.zero,
           color: Colors.white,
-          elevation: 1.5,
-          shadowColor: const Color(0x0F101828),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-            side: const BorderSide(color: Color(0xFFF2E8ED)),
+          elevation: 1.0,
+          shadowColor: const Color(0x0A0F172A),
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.zero,
+            side: BorderSide(color: Color(0xFFF1F5F9)),
           ),
           clipBehavior: Clip.antiAlias,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
+              AspectRatio(
+                aspectRatio: 1.0,
                 child: Container(
                   width: double.infinity,
-                  color: const Color(0xFFFFFBFD),
+                  color: const Color(0xFFF8FAFC),
                   child: Stack(
                     children: [
                       Positioned.fill(
@@ -56,7 +57,7 @@ class ProductCard extends StatelessWidget {
                                 ),
                               )
                             : Padding(
-                                padding: const EdgeInsets.all(5),
+                                padding: const EdgeInsets.all(8),
                                 child: Image.network(
                                   product.imageUrl!,
                                   fit: BoxFit.contain,
@@ -67,7 +68,8 @@ class ProductCard extends StatelessWidget {
                                       size: 40,
                                     ),
                                   ),
-                                )),
+                                ),
+                              ),
                       ),
                       if (product.oldPrice != null &&
                           product.oldPrice! > product.price)
@@ -102,103 +104,113 @@ class ProductCard extends StatelessWidget {
                   ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(13, 10, 13, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            product.brandName.isEmpty
-                                ? 'No brand'
-                                : product.brandName,
-                            maxLines: 1,
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  product.brandName.isEmpty
+                                      ? 'No brand'
+                                      : product.brandName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFF667085),
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              if (product.rating > 0) ...[
+                                const SizedBox(width: 4),
+                                const Icon(Icons.star_rounded,
+                                    size: 13, color: Color(0xFFF4B400)),
+                                const SizedBox(width: 2),
+                                Text(
+                                  product.rating.toStringAsFixed(1),
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.grey.shade600,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            product.name,
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF667085),
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        if (product.rating > 0) ...[
-                          const SizedBox(width: 4),
-                          const Icon(Icons.star_rounded,
-                              size: 14, color: Color(0xFFF4B400)),
-                          const SizedBox(width: 2),
-                          Text(
-                            product.rating.toStringAsFixed(1),
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey.shade600,
-                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              height: 1.15,
                             ),
                           ),
                         ],
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      product.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        height: 1.12,
                       ),
-                    ),
-                    const SizedBox(height: 7),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(product.price.toStringAsFixed(2),
-                                  style: const TextStyle(
-                                      color: brandColor,
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 18)),
-                              if (product.oldPrice != null &&
-                                  product.oldPrice! > product.price)
-                                Text(product.oldPrice!.toStringAsFixed(2),
-                                    style: TextStyle(
-                                        color: Colors.grey.shade500,
-                                        fontSize: 11,
-                                        decoration:
-                                            TextDecoration.lineThrough)),
-                            ],
-                          ),
-                        ),
-                        if (line == null)
-                          SizedBox(
-                            width: 44,
-                            height: 44,
-                            child: IconButton(
-                              onPressed: product.canAddMore(0)
-                                  ? () {
-                                      context.read<ShopState>().add(product);
-                                      showStoreMessage(
-                                        context,
-                                        'Added to cart',
-                                        icon: Icons.check_circle_rounded,
-                                      );
-                                    }
-                                  : null,
-                              style: IconButton.styleFrom(
-                                  foregroundColor: const Color(0xFFD81B60)),
-                              tooltip: 'Add to cart',
-                              icon: const Icon(Icons.add_rounded, size: 24),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(product.price.toStringAsFixed(2),
+                                    style: const TextStyle(
+                                        color: brandColor,
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 15)),
+                                if (product.oldPrice != null &&
+                                    product.oldPrice! > product.price)
+                                  Text(product.oldPrice!.toStringAsFixed(2),
+                                      style: TextStyle(
+                                          color: Colors.grey.shade500,
+                                          fontSize: 10,
+                                          decoration:
+                                              TextDecoration.lineThrough)),
+                              ],
                             ),
-                          )
-                        else
-                          _quantityControl(context, line.quantity),
-                      ],
-                    ),
-                  ],
+                          ),
+                          if (line == null)
+                            SizedBox(
+                              width: 36,
+                              height: 36,
+                              child: IconButton(
+                                padding: EdgeInsets.zero,
+                                onPressed: product.canAddMore(0)
+                                    ? () {
+                                        context.read<ShopState>().add(product);
+                                        showStoreMessage(
+                                          context,
+                                          'Added to cart',
+                                          icon: Icons.check_circle_rounded,
+                                        );
+                                      }
+                                    : null,
+                                style: IconButton.styleFrom(
+                                    foregroundColor: const Color(0xFFD81B60)),
+                                tooltip: 'Add to cart',
+                                icon: const Icon(Icons.add_rounded, size: 22),
+                              ),
+                            )
+                          else
+                            _quantityControl(context, line.quantity),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
