@@ -1,44 +1,95 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
 const brandColor = Color(0xFFEC2F83);
+
+OverlayEntry? _storeMessageEntry;
+Timer? _storeMessageTimer;
 
 void showStoreMessage(
   BuildContext context,
   String message, {
   required IconData icon,
 }) {
-  final messenger = ScaffoldMessenger.of(context);
-  messenger
-    ..hideCurrentSnackBar()
-    ..showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: Colors.white,
-        elevation: 8,
-        duration: const Duration(seconds: 2),
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: Color(0xFFF2E8ED)),
-        ),
-        content: Row(
-          children: [
-            Icon(icon, color: brandColor, size: 20),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                message,
-                style: const TextStyle(
-                  color: Color(0xFF344054),
-                  fontWeight: FontWeight.w600,
+  _storeMessageTimer?.cancel();
+  _storeMessageEntry?.remove();
+  _storeMessageEntry = null;
+
+  final overlay = Overlay.of(context, rootOverlay: true);
+  final media = MediaQuery.of(context);
+  final appBarHeight = Scaffold.maybeOf(context)?.appBarMaxHeight ?? 0;
+  final top = media.padding.top + appBarHeight + 8;
+
+  late final OverlayEntry entry;
+  entry = OverlayEntry(
+    builder: (overlayContext) {
+      return Positioned(
+        top: top,
+        left: 16,
+        right: 16,
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0, end: 1),
+          duration: const Duration(milliseconds: 220),
+          builder: (context, value, child) => Opacity(
+            opacity: value,
+            child: Transform.translate(
+              offset: Offset(0, (1 - value) * -12),
+              child: child,
+            ),
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFF2E8ED)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.12),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                child: Row(
+                  children: [
+                    Icon(icon, color: brandColor, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        message,
+                        style: const TextStyle(
+                          color: Color(0xFF344054),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-          ],
+          ),
         ),
-      ),
-    );
+      );
+    },
+  );
+
+  overlay.insert(entry);
+  _storeMessageEntry = entry;
+  _storeMessageTimer = Timer(const Duration(seconds: 2), () {
+    if (_storeMessageEntry == entry) {
+      entry.remove();
+      _storeMessageEntry = null;
+    }
+  });
 }
 
 String formatPrice(dynamic value) => value is num

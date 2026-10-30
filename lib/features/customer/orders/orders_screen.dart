@@ -64,13 +64,6 @@ class _OrdersViewState extends State<OrdersView> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('MY ACCOUNT',
-                            style: TextStyle(
-                                color: brandColor,
-                                fontSize: 11,
-                                letterSpacing: 1.1,
-                                fontWeight: FontWeight.w900)),
-                        const SizedBox(height: 3),
                         const Text('My Orders',
                             style: TextStyle(
                                 fontSize: 25,

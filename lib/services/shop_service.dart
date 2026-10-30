@@ -151,6 +151,11 @@ class ShopService {
     return Map<String, dynamic>.from(response.data as Map);
   }
 
+  Future<Map<String, dynamic>> productSetDetail(int id) async {
+    final response = await api.dio.get('products/sets/$id/');
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
   Future<List<Map<String, dynamic>>> pointsHistory() async =>
       _rows(await api.dio.get('orders/rewards/history/'));
 

@@ -7,8 +7,13 @@ import 'package:shadow_shop_mobile/state/shop_state.dart';
 import 'package:shadow_shop_mobile/theme/app_theme.dart';
 
 class ProductDetailScreen extends StatefulWidget {
-  const ProductDetailScreen({super.key, required this.product});
+  const ProductDetailScreen({
+    super.key,
+    required this.product,
+    this.setItems = const [],
+  });
   final Product product;
+  final List<Map<String, dynamic>> setItems;
 
   @override
   State<ProductDetailScreen> createState() => _ProductDetailScreenState();
@@ -16,6 +21,7 @@ class ProductDetailScreen extends StatefulWidget {
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   late Future<List<Product>> _recommendations;
+  late List<Map<String, dynamic>> _setItems;
   int _selectedQuantity = 1;
 
   Product get product => widget.product;
@@ -23,11 +29,35 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _setItems = widget.setItems;
     _recommendations = _loadRecommendations();
+    if (product.isProductSet) {
+      _loadSetDetail();
+    }
+  }
+
+  Future<void> _loadSetDetail() async {
+    try {
+      final data = await context.read<ShopState>().service.productSetDetail(
+            product.productSetId ?? product.id,
+          );
+      if (!mounted) return;
+      setState(() {
+        _setItems = Product.setItemsFrom(data);
+      });
+    } catch (_) {}
   }
 
   Future<List<Product>> _loadRecommendations() async {
     final service = context.read<ShopState>().service;
+    if (product.isProductSet) {
+      final sets = await service.productSets(limit: 12);
+      return sets
+          .map(Product.fromSetJson)
+          .where((item) => item.id != product.id)
+          .take(8)
+          .toList();
+    }
     if (product.categoryId != null) {
       final categoryProducts = await service.products(
         categoryId: product.categoryId,
@@ -48,7 +78,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Widget build(BuildContext context) {
     final state = context.watch<ShopState>();
     final quantity = state.cartLines
-            .where((line) => line.product.id == product.id)
+            .where((line) => line.product.cartKey == product.cartKey)
             .firstOrNull
             ?.quantity ??
         0;
@@ -66,33 +96,34 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final saved = state.wishlistIds.contains(product.id);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Product'),
+        title: Text(product.isProductSet ? 'Product set' : 'Product'),
         actions: [
-          IconButton(
-            onPressed: () async {
-              try {
-                await context.read<ShopState>().toggleWishlist(product);
-                if (!context.mounted) return;
-                showStoreMessage(
-                  context,
-                  saved ? 'Removed from wishlist' : 'Added to wishlist',
-                  icon: saved
-                      ? Icons.favorite_border_rounded
-                      : Icons.favorite_rounded,
-                );
-              } catch (error) {
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context)
-                  ..hideCurrentSnackBar()
-                  ..showSnackBar(
-                    SnackBar(content: Text(friendlyError(error))),
+          if (!product.isProductSet)
+            IconButton(
+              onPressed: () async {
+                try {
+                  await context.read<ShopState>().toggleWishlist(product);
+                  if (!context.mounted) return;
+                  showStoreMessage(
+                    context,
+                    saved ? 'Removed from wishlist' : 'Added to wishlist',
+                    icon: saved
+                        ? Icons.favorite_border_rounded
+                        : Icons.favorite_rounded,
                   );
-              }
-            },
-            icon: Icon(saved ? Icons.favorite : Icons.favorite_border,
-                color: saved ? brandColor : null),
-            tooltip: 'Wishlist',
-          ),
+                } catch (error) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context)
+                    ..hideCurrentSnackBar()
+                    ..showSnackBar(
+                      SnackBar(content: Text(friendlyError(error))),
+                    );
+                }
+              },
+              icon: Icon(saved ? Icons.favorite : Icons.favorite_border,
+                  color: saved ? brandColor : null),
+              tooltip: 'Wishlist',
+            ),
           IconButton(
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(
@@ -333,6 +364,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 const SizedBox(height: 16),
                 Text(product.description, style: const TextStyle(height: 1.5)),
               ],
+              if (_setItems.isNotEmpty) ...[
+                const SizedBox(height: 24),
+                const Text(
+                  "What's included",
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 12),
+                ..._setItems.map(_includedItemTile),
+              ],
               const SizedBox(height: 28),
               _recommendationsSection(),
             ],
@@ -382,9 +422,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
           final recommendations = snapshot.data ?? const <Product>[];
           if (recommendations.isEmpty) return const SizedBox.shrink();
-          final sectionTitle = product.categoryName.isNotEmpty
-              ? 'More from ${product.categoryName}'
-              : 'You may also like';
+          final sectionTitle = product.isProductSet
+              ? 'More product sets'
+              : product.categoryName.isNotEmpty
+                  ? 'More from ${product.categoryName}'
+                  : 'You may also like';
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -411,6 +453,85 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           );
         },
       );
+
+  Widget _includedItemTile(Map<String, dynamic> item) {
+    final name = '${item['product_name'] ?? item['name'] ?? 'Item'}';
+    final brand = '${item['brand_name'] ?? ''}'.trim();
+    final quantity = item['quantity'] ?? 1;
+    final imageUrl =
+        '${item['image_url'] ?? item['product_image'] ?? item['primary_image'] ?? ''}';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFFBFD),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFF2E8ED)),
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                width: 56,
+                height: 56,
+                child: imageUrl.isEmpty
+                    ? const ColoredBox(
+                        color: Colors.white,
+                        child: Icon(Icons.spa_outlined, color: brandColor),
+                      )
+                    : Image.network(
+                        imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const ColoredBox(
+                          color: Colors.white,
+                          child: Icon(Icons.spa_outlined, color: brandColor),
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (brand.isNotEmpty)
+                    Text(
+                      brand,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF667085),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  Text(
+                    name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'x$quantity',
+              style: const TextStyle(
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF475467),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _availabilityBadge(Product product) {
     final inStock = product.canAddMore(0);

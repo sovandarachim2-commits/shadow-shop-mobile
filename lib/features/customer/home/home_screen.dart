@@ -12,6 +12,7 @@ import 'package:shadow_shop_mobile/features/customer/rewards/rewards_screen.dart
 import 'package:shadow_shop_mobile/features/customer/wishlist/wishlist_screen.dart';
 import 'package:shadow_shop_mobile/features/customer/profile/profile_screen.dart';
 import 'package:shadow_shop_mobile/features/customer/products/product_sets/product_sets_page.dart';
+import 'package:shadow_shop_mobile/features/customer/products/product_detail_screen.dart';
 import 'package:shadow_shop_mobile/features/customer/rewards/lucky_box/lucky_box_page.dart';
 
 class _FilterOption<T> {
@@ -29,6 +30,7 @@ class HomeScreen extends StatefulWidget {
 
 class StoreScreenState extends State<HomeScreen> {
   final _search = TextEditingController();
+  final _searchFocus = FocusNode();
   Timer? _searchDebounce;
   late Future<List<Product>> _products;
   late Future<List<Map<String, dynamic>>> _sets;
@@ -59,6 +61,7 @@ class StoreScreenState extends State<HomeScreen> {
   void dispose() {
     _searchDebounce?.cancel();
     _search.dispose();
+    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -102,7 +105,7 @@ class StoreScreenState extends State<HomeScreen> {
   }
 
   void _onSearchChanged(String value) {
-    setState(() => _tab = 1);
+    if (_tab != 1) setState(() => _tab = 1);
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 300), () {
       if (mounted) _searchProducts(value);
@@ -144,35 +147,144 @@ class StoreScreenState extends State<HomeScreen> {
         bottomNavigationBar: _bottomNavigation(),
       );
 
-  Widget _searchField() => SizedBox(
-        height: 42,
-        child: TextField(
-          controller: _search,
-          textInputAction: TextInputAction.search,
-          onChanged: _onSearchChanged,
-          onSubmitted: _searchProducts,
-          decoration: InputDecoration(
-            hintText: 'Search products',
-            hintStyle: const TextStyle(fontSize: 14),
-            prefixIcon: const Icon(Icons.search_rounded, size: 20),
-            filled: true,
-            fillColor: const Color(0xFFF9FAFB),
-            contentPadding: const EdgeInsets.symmetric(vertical: 8),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFFE4E7EC)),
+  Widget _searchField() => RawAutocomplete<Product>(
+        key: const ValueKey('store-search'),
+        textEditingController: _search,
+        focusNode: _searchFocus,
+        displayStringForOption: (product) => product.name,
+        optionsBuilder: (value) async {
+          final query = value.text.trim();
+          if (query.isEmpty) return const Iterable<Product>.empty();
+          try {
+            return await context.read<ShopState>().service.products(
+                  search: query,
+                  limit: 8,
+                );
+          } catch (_) {
+            return const Iterable<Product>.empty();
+          }
+        },
+        onSelected: (product) {
+          _searchFocus.unfocus();
+          _searchProducts(product.name);
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => ProductDetailScreen(product: product),
             ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFFE4E7EC)),
+          );
+        },
+        fieldViewBuilder: (context, controller, focusNode, onSubmitted) {
+          return SizedBox(
+            height: 42,
+            child: TextField(
+              controller: controller,
+              focusNode: focusNode,
+              textInputAction: TextInputAction.search,
+              onChanged: _onSearchChanged,
+              onSubmitted: (value) {
+                onSubmitted();
+                _searchProducts(value);
+              },
+              decoration: InputDecoration(
+                hintText: 'Search products',
+                hintStyle: const TextStyle(fontSize: 14),
+                prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                filled: true,
+                fillColor: const Color(0xFFF9FAFB),
+                contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: Color(0xFFE4E7EC)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: Color(0xFFE4E7EC)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: brandColor),
+                ),
+              ),
             ),
-            focusedBorder: OutlineInputBorder(
+          );
+        },
+        optionsViewBuilder: (context, onSelected, options) {
+          final products = options.toList();
+          return Align(
+            alignment: Alignment.topLeft,
+            child: Material(
+              elevation: 8,
+              color: Colors.white,
+              shadowColor: const Color(0x33101828),
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: brandColor),
+              clipBehavior: Clip.antiAlias,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: 320,
+                  maxWidth: MediaQuery.sizeOf(context).width - 32,
+                ),
+                child: ListView.separated(
+                  padding: EdgeInsets.zero,
+                  shrinkWrap: true,
+                  itemCount: products.length,
+                  separatorBuilder: (_, __) => const Divider(
+                    height: 1,
+                    color: Color(0xFFF2E8ED),
+                  ),
+                  itemBuilder: (context, index) {
+                    final product = products[index];
+                    return ListTile(
+                      onTap: () => onSelected(product),
+                      leading: _searchSuggestionImage(product),
+                      title: Text(
+                        product.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                      ),
+                      subtitle: Text(
+                        '\$${product.price.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          color: brandColor,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
             ),
-          ),
-        ),
+          );
+        },
       );
+
+  Widget _searchSuggestionImage(Product product) {
+    final imageUrl = product.imageUrl;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: SizedBox(
+        width: 40,
+        height: 40,
+        child: imageUrl == null
+            ? const ColoredBox(
+                color: Color(0xFFFFFBFD),
+                child: Icon(Icons.spa_outlined, color: brandColor, size: 20),
+              )
+            : Image.network(
+                imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const ColoredBox(
+                  color: Color(0xFFFFFBFD),
+                  child: Icon(Icons.image_not_supported_outlined, size: 18),
+                ),
+              ),
+      ),
+    );
+  }
 
   Widget _bottomNavigation() => SafeArea(
         top: false,
@@ -777,11 +889,18 @@ class StoreScreenState extends State<HomeScreen> {
                               childAspectRatio: .66,
                             ),
                             itemCount: sets.length + products.length,
-                            itemBuilder: (context, index) => index < sets.length
-                                ? _productSetCard(sets[index])
-                                : ProductCard(
-                                    product: products[index - sets.length],
-                                  ),
+                            itemBuilder: (context, index) {
+                              if (index < sets.length) {
+                                final item = sets[index];
+                                return ProductCard(
+                                  product: Product.fromSetJson(item),
+                                  setItems: Product.setItemsFrom(item),
+                                );
+                              }
+                              return ProductCard(
+                                product: products[index - sets.length],
+                              );
+                            },
                           ),
                         ),
                     ]);

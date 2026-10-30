@@ -78,6 +78,45 @@ class Product {
             ? null
             : _asInt(json['flash_sale_max_order_qty']),
       );
+
+  factory Product.fromSetJson(Map<String, dynamic> item) {
+    final id = _asInt(item['id']);
+    final setItems = item['items'] is List ? item['items'] as List : const [];
+    final brands = setItems
+        .whereType<Map>()
+        .map((setItem) => '${setItem['brand_name'] ?? ''}'.trim())
+        .where((brand) => brand.isNotEmpty)
+        .toSet()
+        .join(', ');
+    return Product(
+      id: id,
+      productSetId: id,
+      isProductSet: true,
+      name: '${item['name'] ?? 'Product set'}',
+      description: '${item['description'] ?? ''}',
+      imageUrl: item['image_url']?.toString(),
+      price: _asDouble(item['display_price']),
+      oldPrice:
+          item['old_price'] == null ? null : _asDouble(item['old_price']),
+      stock: _asInt(item['current_stock']),
+      available: item['is_available_for_sale'] != false,
+      availabilityStatus: (item['availability_status'] ?? 'auto').toString(),
+      isFlashSale: item['is_flash_sale_active'] == true,
+      flashSaleMaxOrderQty: item['flash_sale_max_order_qty'] == null
+          ? null
+          : _asInt(item['flash_sale_max_order_qty']),
+      brandName: brands,
+    );
+  }
+
+  static List<Map<String, dynamic>> setItemsFrom(Map<String, dynamic> item) {
+    final setItems = item['items'];
+    if (setItems is! List) return const [];
+    return setItems
+        .whereType<Map>()
+        .map((row) => Map<String, dynamic>.from(row))
+        .toList();
+  }
 }
 
 int _asInt(dynamic value) =>

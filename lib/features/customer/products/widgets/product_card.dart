@@ -6,8 +6,13 @@ import 'package:shadow_shop_mobile/theme/app_theme.dart';
 import 'package:shadow_shop_mobile/features/customer/products/product_detail_screen.dart';
 
 class ProductCard extends StatelessWidget {
-  const ProductCard({super.key, required this.product});
+  const ProductCard({
+    super.key,
+    required this.product,
+    this.setItems = const [],
+  });
   final Product product;
+  final List<Map<String, dynamic>> setItems;
 
   @override
   Widget build(BuildContext context) {
@@ -17,7 +22,10 @@ class ProductCard extends StatelessWidget {
         .firstOrNull;
     return InkWell(
         onTap: () => Navigator.of(context).push(MaterialPageRoute(
-            builder: (_) => ProductDetailScreen(product: product))),
+            builder: (_) => ProductDetailScreen(
+                  product: product,
+                  setItems: setItems,
+                ))),
         borderRadius: BorderRadius.circular(18),
         child: Card(
           margin: EdgeInsets.zero,
